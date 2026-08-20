@@ -1,178 +1,108 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Bosque da Bruxa — Protótipo 2.5D</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bosque da Bruxa 2.5D v2</title>
 <style>
-:root{
-  --rx: 0deg;
-  --ry: 0deg;
-  --mx: 0px;
-  --my: 0px;
-}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#090711;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
-body{display:grid;place-items:center}
-.wrap{width:min(100vw,1200px);padding:12px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
-h1{font-size:clamp(18px,3vw,28px);margin:0}
-small{opacity:.72}
-button{
-  border:0;border-radius:999px;padding:10px 14px;font-weight:700;
-  background:#f2f2f2;color:#111;cursor:pointer
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08050e;font-family:system-ui,sans-serif}
+#stage{
+ position:fixed;inset:0;overflow:hidden;perspective:700px;touch-action:none;
+ background:#12091d;
 }
-.stage{
-  position:relative;
-  width:100%;
-  aspect-ratio:1536/679;
-  perspective:900px;
-  overflow:hidden;
-  border-radius:22px;
-  box-shadow:0 30px 70px rgba(0,0,0,.55);
-  background:#120b25;
-  touch-action:none;
-}
-.scene{
-  position:absolute;inset:-3%;
-  transform-style:preserve-3d;
-  transform:rotateX(var(--rx)) rotateY(var(--ry));
-  transition:transform .08s linear;
+#scene{
+ position:absolute;inset:-8%;
+ transform-style:preserve-3d;
+ transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1.03);
 }
 .layer{
-  position:absolute;inset:0;
-  background-image:url('bosque.png');
-  background-size:100% 100%;
-  background-repeat:no-repeat;
-  will-change:transform;
-  transform-style:preserve-3d;
-  pointer-events:none;
+ position:absolute;inset:0;
+ background:url("bosque.png") center/100% 100% no-repeat;
+ transform-style:preserve-3d;will-change:transform;
 }
-/* Fundo inteiro, recuado */
-.bg{
-  transform:translate3d(calc(var(--mx)*-.15),calc(var(--my)*-.15),-120px) scale(1.16);
-  filter:saturate(.92) brightness(.86);
+/* imagem-base recuada */
+.base{
+ transform:translate3d(calc(var(--x)*-.10),calc(var(--y)*-.06),-220px) scale(1.34);
+ filter:brightness(.72) saturate(.82) blur(.3px);
 }
-/* Floresta e lua ao fundo */
+/* céu, lua e floresta distante */
 .sky{
-  clip-path:polygon(8% 0,92% 0,89% 58%,12% 58%);
-  transform:translate3d(calc(var(--mx)*-.07),calc(var(--my)*-.07),-40px) scale(1.07);
+ clip-path:polygon(5% 0,95% 0,92% 58%,8% 58%);
+ transform:translate3d(calc(var(--x)*-.04),calc(var(--y)*-.03),-100px) scale(1.18);
+ filter:brightness(.9);
 }
-/* Casa + área intermediária direita */
+/* floresta média */
+.forest{
+ clip-path:polygon(5% 23%,69% 20%,68% 76%,5% 79%);
+ transform:translate3d(calc(var(--x)*.12),calc(var(--y)*.07),10px) scale(1.08);
+}
+/* casa */
 .house{
-  clip-path:polygon(58% 7%,92% 5%,94% 78%,53% 82%,56% 52%);
-  transform:translate3d(calc(var(--mx)*.18),calc(var(--my)*.11),55px) scale(.985);
-  filter:brightness(1.03);
+ clip-path:polygon(59% 5%,91% 4%,94% 79%,53% 82%,55% 43%);
+ transform:translate3d(calc(var(--x)*.35),calc(var(--y)*.20),145px) scale(.99);
+ filter:brightness(1.06) drop-shadow(0 14px 14px rgba(0,0,0,.32));
 }
-/* Cerca/caminho intermediário */
-.mid{
-  clip-path:polygon(8% 46%,82% 42%,92% 100%,2% 100%);
-  transform:translate3d(calc(var(--mx)*.28),calc(var(--my)*.17),95px) scale(.975);
+/* caminho e cercas */
+.path{
+ clip-path:polygon(10% 47%,87% 42%,100% 100%,0 100%);
+ transform:translate3d(calc(var(--x)*.50),calc(var(--y)*.29),220px) scale(.955);
+ filter:drop-shadow(0 15px 12px rgba(0,0,0,.25));
 }
-/* Primeiro plano: abóboras, pedras e chão */
+/* objetos do primeiro plano */
 .front{
-  clip-path:polygon(0 66%,100% 64%,100% 100%,0 100%);
-  transform:translate3d(calc(var(--mx)*.46),calc(var(--my)*.28),145px) scale(.96);
-  filter:brightness(1.05) contrast(1.03);
+ clip-path:polygon(0 62%,100% 60%,100% 100%,0 100%);
+ transform:translate3d(calc(var(--x)*.82),calc(var(--y)*.48),330px) scale(.91);
+ filter:brightness(1.08) drop-shadow(0 18px 13px rgba(0,0,0,.35));
 }
-/* Moldura natural: árvores laterais */
+/* troncos laterais, ainda mais perto */
 .frame{
-  clip-path:polygon(0 0,15% 0,11% 74%,0 100%,0 0,100% 0,86% 0,91% 73%,100% 100%);
-  transform:translate3d(calc(var(--mx)*.60),calc(var(--my)*.34),180px) scale(.95);
+ clip-path:polygon(0 0,16% 0,12% 75%,0 100%,0 0,100% 0,84% 0,89% 74%,100% 100%);
+ transform:translate3d(calc(var(--x)*1.05),calc(var(--y)*.60),420px) scale(.87);
+ filter:drop-shadow(0 20px 18px rgba(0,0,0,.45));
 }
-/* brilho leve nas janelas */
-.glow{
-  position:absolute;left:70.1%;top:40.5%;width:12.5%;height:28%;
-  border-radius:45%;
-  background:radial-gradient(circle at 50% 55%,rgba(255,190,70,.22),transparent 65%);
-  transform:translateZ(190px);
-  filter:blur(8px);
-  mix-blend-mode:screen;
-  pointer-events:none;
+.vignette{
+ position:absolute;inset:0;pointer-events:none;
+ background:radial-gradient(circle at 60% 50%,transparent 42%,rgba(0,0,0,.28) 100%);
 }
 .hint{
-  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
-  padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.48);
-  backdrop-filter:blur(8px);font-size:12px;white-space:nowrap
-}
-.badge{
-  position:absolute;right:10px;top:10px;padding:7px 10px;border-radius:999px;
-  background:rgba(0,0,0,.45);backdrop-filter:blur(8px);font-size:12px
+ position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));
+ transform:translateX(-50%);
+ color:white;background:rgba(0,0,0,.58);backdrop-filter:blur(8px);
+ padding:9px 14px;border-radius:30px;font-size:13px;white-space:nowrap;
+ transition:opacity .5s;
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
-    <div>
-      <h1>🌙 Bosque da Bruxa — 2.5D</h1>
-      <small>Protótipo de profundidade para a futura experiência AR da caneca</small>
-    </div>
-    <button id="reset">Centralizar</button>
-  </div>
-
-  <div class="stage" id="stage">
-    <div class="scene" id="scene">
-      <div class="layer bg"></div>
-      <div class="layer sky"></div>
-      <div class="layer house"></div>
-      <div class="layer mid"></div>
-      <div class="layer front"></div>
-      <div class="layer frame"></div>
-      <div class="glow"></div>
-    </div>
-    <div class="badge">Arraste / mova o celular</div>
-    <div class="hint">O cenário reage ao movimento para simular profundidade</div>
-  </div>
+<div id="stage">
+ <div id="scene">
+  <div class="layer base"></div>
+  <div class="layer sky"></div>
+  <div class="layer forest"></div>
+  <div class="layer house"></div>
+  <div class="layer path"></div>
+  <div class="layer front"></div>
+  <div class="layer frame"></div>
+ </div>
+ <div class="vignette"></div>
+ <div class="hint" id="hint">Arraste o dedo para explorar a profundidade</div>
 </div>
-
 <script>
-const root = document.documentElement;
-const stage = document.getElementById('stage');
-let enabledMotion = false;
-
-function setFromPoint(clientX, clientY){
-  const r = stage.getBoundingClientRect();
-  const nx = ((clientX-r.left)/r.width - .5) * 2;
-  const ny = ((clientY-r.top)/r.height - .5) * 2;
-  root.style.setProperty('--ry', `${nx*6}deg`);
-  root.style.setProperty('--rx', `${-ny*4}deg`);
-  root.style.setProperty('--mx', `${nx*22}px`);
-  root.style.setProperty('--my', `${ny*15}px`);
+const root=document.documentElement, stage=document.getElementById("stage"), hint=document.getElementById("hint");
+function move(cx,cy){
+ const r=stage.getBoundingClientRect();
+ let nx=((cx-r.left)/r.width-.5)*2, ny=((cy-r.top)/r.height-.5)*2;
+ nx=Math.max(-1,Math.min(1,nx)); ny=Math.max(-1,Math.min(1,ny));
+ root.style.setProperty("--x",(nx*34)+"px");
+ root.style.setProperty("--y",(ny*22)+"px");
+ root.style.setProperty("--ry",(nx*8)+"deg");
+ root.style.setProperty("--rx",(-ny*5)+"deg");
+ hint.style.opacity="0";
 }
-stage.addEventListener('pointermove', e=>setFromPoint(e.clientX,e.clientY));
-stage.addEventListener('pointerleave', ()=>reset());
-
-function reset(){
-  root.style.setProperty('--ry','0deg');
-  root.style.setProperty('--rx','0deg');
-  root.style.setProperty('--mx','0px');
-  root.style.setProperty('--my','0px');
-}
-document.getElementById('reset').onclick=reset;
-
-// Giroscópio em celulares compatíveis
-async function enableMotion(){
-  if (enabledMotion) return;
-  try{
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function'){
-      const p = await DeviceOrientationEvent.requestPermission();
-      if (p !== 'granted') return;
-    }
-    window.addEventListener('deviceorientation', e=>{
-      if (e.gamma == null || e.beta == null) return;
-      const nx = Math.max(-1,Math.min(1,e.gamma/25));
-      const ny = Math.max(-1,Math.min(1,(e.beta-45)/25));
-      root.style.setProperty('--ry', `${nx*6}deg`);
-      root.style.setProperty('--rx', `${-ny*4}deg`);
-      root.style.setProperty('--mx', `${nx*22}px`);
-      root.style.setProperty('--my', `${ny*15}px`);
-    }, true);
-    enabledMotion = true;
-  }catch(err){}
-}
-stage.addEventListener('click', enableMotion, {once:true});
+stage.addEventListener("pointerdown",e=>move(e.clientX,e.clientY));
+stage.addEventListener("pointermove",e=>{if(e.buttons||e.pointerType==="touch")move(e.clientX,e.clientY)});
+stage.addEventListener("touchmove",e=>{const t=e.touches[0];move(t.clientX,t.clientY);e.preventDefault()},{passive:false});
 </script>
 </body>
 </html>
