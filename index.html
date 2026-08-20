@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Bosque da Bruxa — Protótipo 2.5D</title>
+<style>
+:root{
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 0px;
+  --my: 0px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#090711;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+body{display:grid;place-items:center}
+.wrap{width:min(100vw,1200px);padding:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+h1{font-size:clamp(18px,3vw,28px);margin:0}
+small{opacity:.72}
+button{
+  border:0;border-radius:999px;padding:10px 14px;font-weight:700;
+  background:#f2f2f2;color:#111;cursor:pointer
+}
+.stage{
+  position:relative;
+  width:100%;
+  aspect-ratio:1536/679;
+  perspective:900px;
+  overflow:hidden;
+  border-radius:22px;
+  box-shadow:0 30px 70px rgba(0,0,0,.55);
+  background:#120b25;
+  touch-action:none;
+}
+.scene{
+  position:absolute;inset:-3%;
+  transform-style:preserve-3d;
+  transform:rotateX(var(--rx)) rotateY(var(--ry));
+  transition:transform .08s linear;
+}
+.layer{
+  position:absolute;inset:0;
+  background-image:url('bosque.png');
+  background-size:100% 100%;
+  background-repeat:no-repeat;
+  will-change:transform;
+  transform-style:preserve-3d;
+  pointer-events:none;
+}
+/* Fundo inteiro, recuado */
+.bg{
+  transform:translate3d(calc(var(--mx)*-.15),calc(var(--my)*-.15),-120px) scale(1.16);
+  filter:saturate(.92) brightness(.86);
+}
+/* Floresta e lua ao fundo */
+.sky{
+  clip-path:polygon(8% 0,92% 0,89% 58%,12% 58%);
+  transform:translate3d(calc(var(--mx)*-.07),calc(var(--my)*-.07),-40px) scale(1.07);
+}
+/* Casa + área intermediária direita */
+.house{
+  clip-path:polygon(58% 7%,92% 5%,94% 78%,53% 82%,56% 52%);
+  transform:translate3d(calc(var(--mx)*.18),calc(var(--my)*.11),55px) scale(.985);
+  filter:brightness(1.03);
+}
+/* Cerca/caminho intermediário */
+.mid{
+  clip-path:polygon(8% 46%,82% 42%,92% 100%,2% 100%);
+  transform:translate3d(calc(var(--mx)*.28),calc(var(--my)*.17),95px) scale(.975);
+}
+/* Primeiro plano: abóboras, pedras e chão */
+.front{
+  clip-path:polygon(0 66%,100% 64%,100% 100%,0 100%);
+  transform:translate3d(calc(var(--mx)*.46),calc(var(--my)*.28),145px) scale(.96);
+  filter:brightness(1.05) contrast(1.03);
+}
+/* Moldura natural: árvores laterais */
+.frame{
+  clip-path:polygon(0 0,15% 0,11% 74%,0 100%,0 0,100% 0,86% 0,91% 73%,100% 100%);
+  transform:translate3d(calc(var(--mx)*.60),calc(var(--my)*.34),180px) scale(.95);
+}
+/* brilho leve nas janelas */
+.glow{
+  position:absolute;left:70.1%;top:40.5%;width:12.5%;height:28%;
+  border-radius:45%;
+  background:radial-gradient(circle at 50% 55%,rgba(255,190,70,.22),transparent 65%);
+  transform:translateZ(190px);
+  filter:blur(8px);
+  mix-blend-mode:screen;
+  pointer-events:none;
+}
+.hint{
+  position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+  padding:8px 12px;border-radius:999px;background:rgba(0,0,0,.48);
+  backdrop-filter:blur(8px);font-size:12px;white-space:nowrap
+}
+.badge{
+  position:absolute;right:10px;top:10px;padding:7px 10px;border-radius:999px;
+  background:rgba(0,0,0,.45);backdrop-filter:blur(8px);font-size:12px
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>🌙 Bosque da Bruxa — 2.5D</h1>
+      <small>Protótipo de profundidade para a futura experiência AR da caneca</small>
+    </div>
+    <button id="reset">Centralizar</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="scene" id="scene">
+      <div class="layer bg"></div>
+      <div class="layer sky"></div>
+      <div class="layer house"></div>
+      <div class="layer mid"></div>
+      <div class="layer front"></div>
+      <div class="layer frame"></div>
+      <div class="glow"></div>
+    </div>
+    <div class="badge">Arraste / mova o celular</div>
+    <div class="hint">O cenário reage ao movimento para simular profundidade</div>
+  </div>
+</div>
+
+<script>
+const root = document.documentElement;
+const stage = document.getElementById('stage');
+let enabledMotion = false;
+
+function setFromPoint(clientX, clientY){
+  const r = stage.getBoundingClientRect();
+  const nx = ((clientX-r.left)/r.width - .5) * 2;
+  const ny = ((clientY-r.top)/r.height - .5) * 2;
+  root.style.setProperty('--ry', `${nx*6}deg`);
+  root.style.setProperty('--rx', `${-ny*4}deg`);
+  root.style.setProperty('--mx', `${nx*22}px`);
+  root.style.setProperty('--my', `${ny*15}px`);
+}
+stage.addEventListener('pointermove', e=>setFromPoint(e.clientX,e.clientY));
+stage.addEventListener('pointerleave', ()=>reset());
+
+function reset(){
+  root.style.setProperty('--ry','0deg');
+  root.style.setProperty('--rx','0deg');
+  root.style.setProperty('--mx','0px');
+  root.style.setProperty('--my','0px');
+}
+document.getElementById('reset').onclick=reset;
+
+// Giroscópio em celulares compatíveis
+async function enableMotion(){
+  if (enabledMotion) return;
+  try{
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'){
+      const p = await DeviceOrientationEvent.requestPermission();
+      if (p !== 'granted') return;
+    }
+    window.addEventListener('deviceorientation', e=>{
+      if (e.gamma == null || e.beta == null) return;
+      const nx = Math.max(-1,Math.min(1,e.gamma/25));
+      const ny = Math.max(-1,Math.min(1,(e.beta-45)/25));
+      root.style.setProperty('--ry', `${nx*6}deg`);
+      root.style.setProperty('--rx', `${-ny*4}deg`);
+      root.style.setProperty('--mx', `${nx*22}px`);
+      root.style.setProperty('--my', `${ny*15}px`);
+    }, true);
+    enabledMotion = true;
+  }catch(err){}
+}
+stage.addEventListener('click', enableMotion, {once:true});
+</script>
+</body>
+</html>

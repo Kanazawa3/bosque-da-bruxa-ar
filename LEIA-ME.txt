@@ -1,0 +1,11 @@
+PROTÓTIPO 2.5D — BOSQUE DA BRUXA
+
+1. Abra index.html no computador para testar com o mouse.
+2. No celular, o ideal é abrir por um servidor web (não diretamente como arquivo local).
+3. Arraste/mova para ver o efeito de profundidade.
+4. Este protótipo ainda NÃO é AR com reconhecimento da caneca.
+   Ele é a etapa visual 2.5D que vamos usar dentro da experiência AR.
+
+Arquivos:
+- index.html
+- bosque.png
