@@ -1,108 +1,270 @@
-<!doctype html>
-<html lang="pt-BR">
+<!DOCTYPE html>
+<html lang="pt-br">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Bosque da Bruxa 2.5D v2</title>
-<style>
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08050e;font-family:system-ui,sans-serif}
-#stage{
- position:fixed;inset:0;overflow:hidden;perspective:700px;touch-action:none;
- background:#12091d;
-}
-#scene{
- position:absolute;inset:-8%;
- transform-style:preserve-3d;
- transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1.03);
-}
-.layer{
- position:absolute;inset:0;
- background:url("bosque.png") center/100% 100% no-repeat;
- transform-style:preserve-3d;will-change:transform;
-}
-/* imagem-base recuada */
-.base{
- transform:translate3d(calc(var(--x)*-.10),calc(var(--y)*-.06),-220px) scale(1.34);
- filter:brightness(.72) saturate(.82) blur(.3px);
-}
-/* céu, lua e floresta distante */
-.sky{
- clip-path:polygon(5% 0,95% 0,92% 58%,8% 58%);
- transform:translate3d(calc(var(--x)*-.04),calc(var(--y)*-.03),-100px) scale(1.18);
- filter:brightness(.9);
-}
-/* floresta média */
-.forest{
- clip-path:polygon(5% 23%,69% 20%,68% 76%,5% 79%);
- transform:translate3d(calc(var(--x)*.12),calc(var(--y)*.07),10px) scale(1.08);
-}
-/* casa */
-.house{
- clip-path:polygon(59% 5%,91% 4%,94% 79%,53% 82%,55% 43%);
- transform:translate3d(calc(var(--x)*.35),calc(var(--y)*.20),145px) scale(.99);
- filter:brightness(1.06) drop-shadow(0 14px 14px rgba(0,0,0,.32));
-}
-/* caminho e cercas */
-.path{
- clip-path:polygon(10% 47%,87% 42%,100% 100%,0 100%);
- transform:translate3d(calc(var(--x)*.50),calc(var(--y)*.29),220px) scale(.955);
- filter:drop-shadow(0 15px 12px rgba(0,0,0,.25));
-}
-/* objetos do primeiro plano */
-.front{
- clip-path:polygon(0 62%,100% 60%,100% 100%,0 100%);
- transform:translate3d(calc(var(--x)*.82),calc(var(--y)*.48),330px) scale(.91);
- filter:brightness(1.08) drop-shadow(0 18px 13px rgba(0,0,0,.35));
-}
-/* troncos laterais, ainda mais perto */
-.frame{
- clip-path:polygon(0 0,16% 0,12% 75%,0 100%,0 0,100% 0,84% 0,89% 74%,100% 100%);
- transform:translate3d(calc(var(--x)*1.05),calc(var(--y)*.60),420px) scale(.87);
- filter:drop-shadow(0 20px 18px rgba(0,0,0,.45));
-}
-.vignette{
- position:absolute;inset:0;pointer-events:none;
- background:radial-gradient(circle at 60% 50%,transparent 42%,rgba(0,0,0,.28) 100%);
-}
-.hint{
- position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));
- transform:translateX(-50%);
- color:white;background:rgba(0,0,0,.58);backdrop-filter:blur(8px);
- padding:9px 14px;border-radius:30px;font-size:13px;white-space:nowrap;
- transition:opacity .5s;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>Protótipo 3D: Bosque da Bruxa</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1a0a2a;
+            font-family: sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: #dcbfff;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
+            font-size: 14px;
+            z-index: 10;
+        }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-<div id="stage">
- <div id="scene">
-  <div class="layer base"></div>
-  <div class="layer sky"></div>
-  <div class="layer forest"></div>
-  <div class="layer house"></div>
-  <div class="layer path"></div>
-  <div class="layer front"></div>
-  <div class="layer frame"></div>
- </div>
- <div class="vignette"></div>
- <div class="hint" id="hint">Arraste o dedo para explorar a profundidade</div>
-</div>
-<script>
-const root=document.documentElement, stage=document.getElementById("stage"), hint=document.getElementById("hint");
-function move(cx,cy){
- const r=stage.getBoundingClientRect();
- let nx=((cx-r.left)/r.width-.5)*2, ny=((cy-r.top)/r.height-.5)*2;
- nx=Math.max(-1,Math.min(1,nx)); ny=Math.max(-1,Math.min(1,ny));
- root.style.setProperty("--x",(nx*34)+"px");
- root.style.setProperty("--y",(ny*22)+"px");
- root.style.setProperty("--ry",(nx*8)+"deg");
- root.style.setProperty("--rx",(-ny*5)+"deg");
- hint.style.opacity="0";
-}
-stage.addEventListener("pointerdown",e=>move(e.clientX,e.clientY));
-stage.addEventListener("pointermove",e=>{if(e.buttons||e.pointerType==="touch")move(e.clientX,e.clientY)});
-stage.addEventListener("touchmove",e=>{const t=e.touches[0];move(t.clientX,t.clientY);e.preventDefault()},{passive:false});
-</script>
+    <div id="info">Arraste para girar, pinça para zoom</div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a0a2a);
+            scene.fog = new THREE.FogExp2(0x1a0a2a, 0.018);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            document.body.appendChild(renderer.domElement);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(11, 8, 16);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.06;
+            controls.minDistance = 7;
+            controls.maxDistance = 28;
+            controls.maxPolarAngle = Math.PI * 0.49;
+            controls.target.set(0, 2, 0);
+            controls.update();
+
+            scene.add(new THREE.HemisphereLight(0x6a4c93, 0x221126, 1.5));
+
+            const moonLight = new THREE.DirectionalLight(0xfff0d0, 1.2);
+            moonLight.position.set(-10, 18, 8);
+            moonLight.castShadow = true;
+            scene.add(moonLight);
+
+            // Base do diorama
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(8, 8.4, 0.65, 48),
+                new THREE.MeshStandardMaterial({ color: 0x2a1732, roughness: 0.95 })
+            );
+            base.position.y = -0.35;
+            base.receiveShadow = true;
+            scene.add(base);
+
+            const grass = new THREE.Mesh(
+                new THREE.CylinderGeometry(7.8, 7.8, 0.18, 48),
+                new THREE.MeshStandardMaterial({ color: 0x24351e, roughness: 1 })
+            );
+            grass.position.y = 0.02;
+            grass.receiveShadow = true;
+            scene.add(grass);
+
+            // Caminho
+            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x74666e, roughness: 1 });
+            const stones = [[0,7],[.8,5.8],[-.5,4.8],[.6,3.6],[-.2,2.5],[.8,1.4],[1.8,.4]];
+            stones.forEach(([x,z],i)=>{
+                const s = new THREE.Mesh(new THREE.CylinderGeometry(.75,.82,.12,10), stoneMat);
+                s.position.set(x,.14,z-3.4);
+                s.rotation.y = i*.47;
+                s.scale.z = .65;
+                s.receiveShadow = true;
+                scene.add(s);
+            });
+
+            // Casa
+            const house = new THREE.Group();
+            house.position.set(3.2,0,-1);
+            scene.add(house);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x51351f, roughness: .9 });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4.2,3.8,3.5), wallMat);
+            body.position.y = 2;
+            body.castShadow = body.receiveShadow = true;
+            house.add(body);
+
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x2b1738, roughness: .85 });
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(3.4,3.6,4), roofMat);
+            roof.position.y = 5.45;
+            roof.rotation.y = Math.PI/4;
+            roof.scale.z = .85;
+            roof.castShadow = true;
+            house.add(roof);
+
+            const chimney = new THREE.Mesh(
+                new THREE.BoxGeometry(.55,2,.7),
+                new THREE.MeshStandardMaterial({color:0x3a3035, roughness:1})
+            );
+            chimney.position.set(1.15,5.8,-.35);
+            chimney.rotation.z = -.18;
+            chimney.castShadow = true;
+            house.add(chimney);
+
+            const door = new THREE.Mesh(
+                new THREE.BoxGeometry(1.05,2.1,.08),
+                new THREE.MeshStandardMaterial({color:0x2e1710})
+            );
+            door.position.set(0,1.15,1.79);
+            house.add(door);
+
+            const winMat = new THREE.MeshStandardMaterial({
+                color:0xffb02e, emissive:0xff7a00, emissiveIntensity:2
+            });
+            [-1.1,1.1].forEach(x=>{
+                const w = new THREE.Mesh(new THREE.PlaneGeometry(.8,1.05), winMat);
+                w.position.set(x,2.55,1.77);
+                house.add(w);
+            });
+            const warm = new THREE.PointLight(0xff7b21, 5, 8, 2);
+            warm.position.set(0,2.4,2.1);
+            house.add(warm);
+
+            // árvores
+            const trunkMat = new THREE.MeshStandardMaterial({color:0x392317,roughness:1});
+            const pineMat = new THREE.MeshStandardMaterial({color:0x173323,roughness:1});
+
+            function pine(x,z,s=1){
+                const g = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,1.5,8),trunkMat);
+                trunk.position.y=.75;
+                g.add(trunk);
+                for(let i=0;i<3;i++){
+                    const c = new THREE.Mesh(new THREE.ConeGeometry(1.3-i*.2,2.5,10),pineMat);
+                    c.position.y=1.7+i*.9;
+                    c.castShadow=true;
+                    g.add(c);
+                }
+                g.position.set(x,0,z);
+                g.scale.setScalar(s);
+                scene.add(g);
+            }
+            pine(-5,-3,1.2); pine(-6,1,.95); pine(-4.5,4,.8); pine(6,-3,.85);
+
+            // cercas
+            const fenceMat = new THREE.MeshStandardMaterial({color:0x5a3923,roughness:1});
+            function fenceLine(x,z,count,rot=0){
+                const g=new THREE.Group();
+                for(let i=0;i<count;i++){
+                    const p=new THREE.Mesh(new THREE.BoxGeometry(.22,1.4,.22),fenceMat);
+                    p.position.set(i*1.15,.7,0); p.castShadow=true; g.add(p);
+                    if(i<count-1){
+                        const r=new THREE.Mesh(new THREE.BoxGeometry(1.15,.15,.15),fenceMat);
+                        r.position.set(i*1.15+.57,.85,0); g.add(r);
+                    }
+                }
+                g.position.set(x,0,z); g.rotation.y=rot; scene.add(g);
+            }
+            fenceLine(-5.5,3.6,5,.08);
+            fenceLine(-2.5,-4.6,4,-.35);
+
+            // Abóboras
+            function pumpkin(x,z,s=1){
+                const g=new THREE.Group();
+                const mat=new THREE.MeshStandardMaterial({color:0xe86d16,roughness:.7});
+                for(let i=0;i<5;i++){
+                    const p=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),mat);
+                    p.scale.set(.72,.78,.55);
+                    p.rotation.y=i*Math.PI/5;
+                    g.add(p);
+                }
+                const stem=new THREE.Mesh(new THREE.CylinderGeometry(.07,.1,.35,7),
+                    new THREE.MeshStandardMaterial({color:0x35511f}));
+                stem.position.y=.48; g.add(stem);
+                g.position.set(x,.48*s,z); g.scale.setScalar(s);
+                scene.add(g);
+            }
+            pumpkin(-2.6,4.7,1.5); pumpkin(-.8,3.8,.9); pumpkin(5.1,1.2,.95); pumpkin(4.7,2.4,.65);
+
+            // Cogumelos
+            function mushroom(x,z,s=.5){
+                const g=new THREE.Group();
+                const st=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,.55,8),
+                    new THREE.MeshStandardMaterial({color:0xeadfc2}));
+                st.position.y=.27;
+                const cap=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8,0,Math.PI*2,0,Math.PI/2),
+                    new THREE.MeshStandardMaterial({color:0xb93833}));
+                cap.position.y=.52; cap.scale.y=.7;
+                g.add(st,cap); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
+            }
+            mushroom(-3.6,3.3,1); mushroom(-3.1,3.6,.7); mushroom(2.5,3.8,.65);
+
+            // Lampião
+            const lampGroup = new THREE.Group();
+            lampGroup.position.set(-1.8,0,1.5);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(.09,.12,3,8),trunkMat);
+            post.position.y=1.5; lampGroup.add(post);
+            const lamp = new THREE.Mesh(new THREE.BoxGeometry(.55,.7,.55),
+                new THREE.MeshStandardMaterial({color:0xffc65a,emissive:0xff8a00,emissiveIntensity:2}));
+            lamp.position.y=2.8; lampGroup.add(lamp);
+            const ll = new THREE.PointLight(0xff8a20,3.5,6,2); ll.position.y=2.8; lampGroup.add(ll);
+            scene.add(lampGroup);
+
+            // Lua no fundo
+            const moon = new THREE.Mesh(
+                new THREE.SphereGeometry(2.1,32,24),
+                new THREE.MeshBasicMaterial({color:0xffe7a3})
+            );
+            moon.position.set(-10,12,-12);
+            scene.add(moon);
+
+            // estrelas simples
+            const starGeo = new THREE.BufferGeometry();
+            const pts=[];
+            for(let i=0;i<180;i++){
+                pts.push((Math.random()-.5)*45, 5+Math.random()*18, -8-Math.random()*15);
+            }
+            starGeo.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+            scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xd8c6ff,size:.07})));
+
+            window.addEventListener('resize',()=>{
+                camera.aspect=innerWidth/innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(innerWidth,innerHeight);
+            });
+        }
+
+        function animate(){
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene,camera);
+        }
+    </script>
 </body>
 </html>
