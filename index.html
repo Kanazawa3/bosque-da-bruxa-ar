@@ -2,90 +2,110 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>Bosque da Bruxa AR</title>
 
-  <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: system-ui, sans-serif;
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     }
 
-    #status {
-      position: fixed;
-      z-index: 9999;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      color: white;
-      background: rgba(0,0,0,.60);
-      padding: 9px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      text-align: center;
-      white-space: nowrap;
-      pointer-events: none;
-      backdrop-filter: blur(8px);
+    /* Força o vídeo da câmera a ficar visível atrás do canvas do A-Frame */
+    video{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      object-fit:cover !important;
+      z-index:0 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+      display:block !important;
+      background:#000;
     }
 
-    .hidden { display: none; }
-
-    .mindar-ui-overlay {
-      z-index: 9000 !important;
+    a-scene,
+    .a-canvas{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      z-index:2 !important;
+      background:transparent !important;
     }
+
+    .mindar-ui-overlay{
+      z-index:5 !important;
+    }
+
+    #status{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      z-index:10;
+      color:#fff;
+      background:rgba(0,0,0,.62);
+      padding:9px 14px;
+      border-radius:999px;
+      font-size:13px;
+      white-space:nowrap;
+      backdrop-filter:blur(8px);
+      pointer-events:none;
+    }
+
+    #debug{
+      position:fixed;
+      left:8px;
+      top:8px;
+      z-index:10;
+      color:#fff;
+      background:rgba(0,0,0,.58);
+      padding:6px 8px;
+      border-radius:8px;
+      font-size:11px;
+      max-width:88vw;
+      pointer-events:none;
+    }
+
+    .hidden{display:none}
   </style>
 </head>
-
 <body>
+
+  <div id="debug">Inicializando câmera...</div>
   <div id="status">Aponte a câmera para a imagem do Bosque da Bruxa</div>
 
   <a-scene
-    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 5; warmupTolerance: 5;"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
     embedded
-    color-space="sRGB"
-    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false">
+    vr-mode-ui="enabled:false"
+    device-orientation-permission-ui="enabled:false"
+    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
 
     <a-assets></a-assets>
 
-    <!-- Luz -->
-    <a-entity light="type: ambient; color: #745a8c; intensity: 1.2"></a-entity>
-    <a-entity light="type: directional; color: #ffe8bd; intensity: 1.1" position="-2 4 3"></a-entity>
+    <a-entity light="type:ambient; color:#6c5a85; intensity:1.3"></a-entity>
+    <a-entity light="type:directional; color:#ffe8bd; intensity:1.0" position="-2 4 3"></a-entity>
 
-    <!-- O alvo compilado no targets.mind -->
-    <a-entity id="target" mindar-image-target="targetIndex: 0">
+    <a-entity id="target" mindar-image-target="targetIndex:0">
 
-      <!--
-        Todo o diorama está dentro deste grupo.
-        Ele fica "preso" à imagem reconhecida.
-      -->
-      <a-entity id="diorama" position="0 0.12 0" rotation="-10 0 0" scale="0.42 0.42 0.42">
+      <a-entity id="diorama" position="0 0.12 0" rotation="-8 0 0" scale="0.42 0.42 0.42">
 
-        <!-- Base / terreno -->
-        <a-cylinder
-          position="0 0 0"
-          radius="1.25"
-          height="0.12"
-          segments-radial="48"
-          material="color: #2a1732; roughness: 1">
-        </a-cylinder>
+        <!-- Base -->
+        <a-cylinder position="0 0 0" radius="1.25" height="0.12" segments-radial="48"
+          material="color:#2a1732; roughness:1"></a-cylinder>
 
-        <a-cylinder
-          position="0 0.075 0"
-          radius="1.20"
-          height="0.06"
-          segments-radial="48"
-          material="color: #263b20; roughness: 1">
-        </a-cylinder>
+        <a-cylinder position="0 0.075 0" radius="1.20" height="0.06" segments-radial="48"
+          material="color:#263b20; roughness:1"></a-cylinder>
 
         <!-- Caminho -->
         <a-cylinder position="-0.05 0.12 0.86" radius="0.17" height="0.025"
@@ -97,93 +117,53 @@
         <a-cylinder position="0.10 0.12 0.03" radius="0.13" height="0.025"
           scale="1.15 1 0.68" material="color:#665a62"></a-cylinder>
 
-        <!-- CASA -->
+        <!-- Casa -->
         <a-entity position="0.48 0.12 -0.18">
+          <a-box position="0 0.43 0" width="0.72" height="0.78" depth="0.58"
+            material="color:#5b3b25; roughness:1"></a-box>
 
-          <!-- paredes -->
-          <a-box
-            position="0 0.43 0"
-            width="0.72"
-            height="0.78"
-            depth="0.58"
-            material="color:#5b3b25; roughness:1">
-          </a-box>
+          <a-cone position="0 1.02 0" radius-bottom="0.66" radius-top="0" height="0.78"
+            segments-radial="4" rotation="0 45 0" scale="1 1 .86"
+            material="color:#352047; roughness:.9"></a-cone>
 
-          <!-- telhado -->
-          <a-cone
-            position="0 1.02 0"
-            radius-bottom="0.66"
-            radius-top="0"
-            height="0.78"
-            segments-radial="4"
-            rotation="0 45 0"
-            scale="1 1 0.86"
-            material="color:#352047; roughness:.9">
-          </a-cone>
+          <a-box position="0.22 1.12 -0.08" width="0.11" height="0.42" depth="0.12"
+            rotation="0 0 -10" material="color:#3d3438"></a-box>
 
-          <!-- chaminé -->
-          <a-box
-            position="0.22 1.12 -0.08"
-            width="0.11"
-            height="0.42"
-            depth="0.12"
-            rotation="0 0 -10"
-            material="color:#3d3438">
-          </a-box>
+          <a-box position="0 0.36 0.296" width="0.19" height="0.43" depth="0.025"
+            material="color:#2c1712"></a-box>
 
-          <!-- porta -->
-          <a-box
-            position="0 0.36 0.296"
-            width="0.19"
-            height="0.43"
-            depth="0.025"
-            material="color:#2c1712">
-          </a-box>
+          <a-plane position="-0.22 0.50 0.296" width="0.15" height="0.20"
+            material="color:#ffb02e; emissive:#ff7a00; emissiveIntensity:2"></a-plane>
+          <a-plane position="0.22 0.50 0.296" width="0.15" height="0.20"
+            material="color:#ffb02e; emissive:#ff7a00; emissiveIntensity:2"></a-plane>
 
-          <!-- janelas -->
-          <a-plane
-            position="-0.22 0.50 0.296"
-            width="0.15"
-            height="0.20"
-            material="color:#ffb02e; emissive:#ff7a00; emissiveIntensity:2">
-          </a-plane>
-
-          <a-plane
-            position="0.22 0.50 0.296"
-            width="0.15"
-            height="0.20"
-            material="color:#ffb02e; emissive:#ff7a00; emissiveIntensity:2">
-          </a-plane>
-
-          <a-entity
-            light="type: point; color:#ff7b21; intensity:2.8; distance:2.2"
-            position="0 0.50 0.40">
-          </a-entity>
+          <a-entity light="type:point; color:#ff7b21; intensity:2.8; distance:2.2"
+            position="0 0.50 0.40"></a-entity>
         </a-entity>
 
-        <!-- PINHEIROS -->
-        <a-entity position="-0.73 0.12 -0.40" scale="0.82 0.82 0.82">
+        <!-- Pinheiros -->
+        <a-entity position="-0.73 0.12 -0.40" scale=".82 .82 .82">
           <a-cylinder position="0 .20 0" radius=".05" height=".40" material="color:#4a2d1d"></a-cylinder>
           <a-cone position="0 .52 0" radius-bottom=".28" height=".52" material="color:#173523"></a-cone>
           <a-cone position="0 .73 0" radius-bottom=".23" height=".45" material="color:#183925"></a-cone>
           <a-cone position="0 .91 0" radius-bottom=".18" height=".36" material="color:#1b3f29"></a-cone>
         </a-entity>
 
-        <a-entity position="-0.91 0.12 0.17" scale="0.64 0.64 0.64">
+        <a-entity position="-0.91 0.12 0.17" scale=".64 .64 .64">
           <a-cylinder position="0 .20 0" radius=".05" height=".40" material="color:#4a2d1d"></a-cylinder>
           <a-cone position="0 .52 0" radius-bottom=".28" height=".52" material="color:#173523"></a-cone>
           <a-cone position="0 .73 0" radius-bottom=".23" height=".45" material="color:#183925"></a-cone>
           <a-cone position="0 .91 0" radius-bottom=".18" height=".36" material="color:#1b3f29"></a-cone>
         </a-entity>
 
-        <a-entity position="0.92 0.12 -0.55" scale="0.62 0.62 0.62">
+        <a-entity position="0.92 0.12 -0.55" scale=".62 .62 .62">
           <a-cylinder position="0 .20 0" radius=".05" height=".40" material="color:#4a2d1d"></a-cylinder>
           <a-cone position="0 .52 0" radius-bottom=".28" height=".52" material="color:#173523"></a-cone>
           <a-cone position="0 .73 0" radius-bottom=".23" height=".45" material="color:#183925"></a-cone>
           <a-cone position="0 .91 0" radius-bottom=".18" height=".36" material="color:#1b3f29"></a-cone>
         </a-entity>
 
-        <!-- CERCA -->
+        <!-- Cerca -->
         <a-entity position="-0.56 0.14 0.50" rotation="0 -12 0">
           <a-box position="-0.25 .18 0" width=".05" height=".36" depth=".05" material="color:#604027"></a-box>
           <a-box position="0 .18 0" width=".05" height=".36" depth=".05" material="color:#604027"></a-box>
@@ -191,23 +171,23 @@
           <a-box position="0 .21 0" width=".55" height=".04" depth=".04" material="color:#604027"></a-box>
         </a-entity>
 
-        <!-- ABÓBORAS -->
-        <a-entity position="-0.42 0.22 0.72" scale="0.95 0.78 0.95">
+        <!-- Abóboras -->
+        <a-entity position="-0.42 0.22 0.72" scale=".95 .78 .95">
           <a-sphere radius=".16" material="color:#ef741b"></a-sphere>
           <a-cylinder position="0 .17 0" radius=".025" height=".10" material="color:#36541f"></a-cylinder>
         </a-entity>
 
-        <a-entity position="0.66 0.19 0.31" scale="0.72 0.60 0.72">
+        <a-entity position="0.66 0.19 0.31" scale=".72 .60 .72">
           <a-sphere radius=".16" material="color:#f07b19"></a-sphere>
           <a-cylinder position="0 .17 0" radius=".025" height=".10" material="color:#36541f"></a-cylinder>
         </a-entity>
 
-        <a-entity position="0.32 0.18 0.64" scale="0.55 0.48 0.55">
+        <a-entity position="0.32 0.18 0.64" scale=".55 .48 .55">
           <a-sphere radius=".16" material="color:#dc6212"></a-sphere>
           <a-cylinder position="0 .17 0" radius=".025" height=".10" material="color:#36541f"></a-cylinder>
         </a-entity>
 
-        <!-- COGUMELOS -->
+        <!-- Cogumelo -->
         <a-entity position="-0.76 0.16 0.64" scale=".62 .62 .62">
           <a-cylinder position="0 .08 0" radius=".035" height=".17" material="color:#eee1c4"></a-cylinder>
           <a-sphere position="0 .19 0" radius=".10" scale="1 .55 1" material="color:#b93b37"></a-sphere>
@@ -222,33 +202,77 @@
             position="0 .72 0"></a-entity>
         </a-entity>
 
-        <!-- Lua decorativa ao fundo do diorama -->
-        <a-sphere
-          position="-0.70 1.20 -0.85"
-          radius="0.23"
-          material="color:#ffe8a4; emissive:#ffd76e; emissiveIntensity:.7">
-        </a-sphere>
+        <a-sphere position="-0.70 1.20 -0.85" radius=".23"
+          material="color:#ffe8a4; emissive:#ffd76e; emissiveIntensity:.7"></a-sphere>
 
       </a-entity>
     </a-entity>
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
   </a-scene>
 
   <script>
-    window.addEventListener("DOMContentLoaded", () => {
-      const target = document.querySelector("#target");
-      const status = document.querySelector("#status");
+    const debug = document.getElementById('debug');
+    const status = document.getElementById('status');
 
-      target.addEventListener("targetFound", () => {
-        status.textContent = "Bosque encontrado!";
-        setTimeout(() => status.classList.add("hidden"), 900);
+    function show(msg){
+      debug.textContent = msg;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const scene = document.querySelector('a-scene');
+      const target = document.querySelector('#target');
+
+      scene.addEventListener('loaded', () => {
+        show('Cena carregada. Iniciando câmera...');
       });
 
-      target.addEventListener("targetLost", () => {
-        status.classList.remove("hidden");
-        status.textContent = "Aponte novamente para a imagem do Bosque da Bruxa";
+      scene.addEventListener('arReady', () => {
+        show('Câmera pronta. Procure a imagem do bosque.');
       });
+
+      scene.addEventListener('arError', (e) => {
+        show('Erro ao iniciar câmera/AR.');
+        console.error(e);
+      });
+
+      target.addEventListener('targetFound', () => {
+        show('Imagem reconhecida.');
+        status.textContent = 'Bosque encontrado!';
+        setTimeout(() => status.classList.add('hidden'), 900);
+      });
+
+      target.addEventListener('targetLost', () => {
+        show('Imagem perdida. Aponte novamente.');
+        status.classList.remove('hidden');
+        status.textContent = 'Aponte novamente para a imagem do Bosque da Bruxa';
+      });
+
+      // Reaplica estilos ao vídeo criado dinamicamente pelo MindAR.
+      const forceVideoVisible = () => {
+        const videos = document.querySelectorAll('video');
+        videos.forEach(v => {
+          v.setAttribute('playsinline','');
+          v.setAttribute('autoplay','');
+          v.muted = true;
+          Object.assign(v.style, {
+            position:'fixed',
+            inset:'0',
+            width:'100vw',
+            height:'100vh',
+            objectFit:'cover',
+            zIndex:'0',
+            display:'block',
+            opacity:'1',
+            visibility:'visible'
+          });
+          if (v.paused) {
+            v.play().catch(()=>{});
+          }
+        });
+      };
+
+      setInterval(forceVideoVisible, 500);
     });
   </script>
 </body>
