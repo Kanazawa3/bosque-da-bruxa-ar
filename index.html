@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Bosque da Bruxa AR - Diagnóstico</title>
+  <title>Bosque da Bruxa AR</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -43,48 +43,49 @@
 
     .mindar-ui-overlay{z-index:5 !important}
 
-    #panel{
-      position:fixed;
-      left:8px;
-      right:8px;
-      top:8px;
-      z-index:30;
-      color:#fff;
-      background:rgba(0,0,0,.72);
-      border-radius:12px;
-      padding:10px 12px;
-      font-size:12px;
-      line-height:1.45;
-      pointer-events:none;
-      backdrop-filter:blur(8px);
-      max-height:38vh;
-      overflow:auto;
-      white-space:pre-wrap;
-    }
-
     #status{
       position:fixed;
       left:50%;
       bottom:18px;
       transform:translateX(-50%);
-      z-index:30;
+      z-index:20;
       color:#fff;
-      background:rgba(0,0,0,.68);
-      padding:9px 14px;
+      background:rgba(0,0,0,.66);
+      padding:10px 14px;
       border-radius:999px;
       font-size:13px;
       white-space:nowrap;
+      backdrop-filter:blur(8px);
       pointer-events:none;
+    }
+
+    #debug{
+      position:fixed;
+      left:8px;
+      right:8px;
+      top:8px;
+      z-index:20;
+      color:#fff;
+      background:rgba(0,0,0,.68);
+      padding:9px 11px;
+      border-radius:10px;
+      font-size:11px;
+      line-height:1.4;
+      white-space:pre-wrap;
+      pointer-events:none;
+      max-height:30vh;
+      overflow:auto;
     }
 
     #exploreBtn,#backBtn{
       position:fixed;
       top:16px;
-      z-index:40;
+      z-index:30;
       border:0;
       border-radius:999px;
       padding:11px 15px;
       font-weight:700;
+      font-size:14px;
       pointer-events:auto;
       display:none;
     }
@@ -95,12 +96,12 @@
     .hidden{display:none !important}
   </style>
 </head>
-<body>
 
-  <div id="panel">Diagnóstico iniciado...</div>
+<body>
+  <div id="debug">Página carregada.</div>
   <button id="backBtn">← Voltar ao AR</button>
   <button id="exploreBtn">Explorar em 3D</button>
-  <div id="status">Carregando modelo...</div>
+  <div id="status">Iniciando câmera...</div>
 
   <a-scene
     id="scene"
@@ -110,306 +111,370 @@
     device-orientation-permission-ui="enabled:false"
     renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
 
-    <a-assets timeout="90000">
-      <a-asset-item id="witchHouse" src="./Casa_da_bruxa_web.glb"></a-asset-item>
-    </a-assets>
+    <!-- IMPORTANTE: sem a-assets para não bloquear a câmera -->
 
     <a-entity light="type:ambient; intensity:1.5; color:#ffffff"></a-entity>
-    <a-entity light="type:directional; intensity:1.4; color:#ffe8c2" position="-2 4 3"></a-entity>
+    <a-entity light="type:directional; intensity:1.3; color:#ffe8c2" position="-2 4 3"></a-entity>
 
-    <!-- AR -->
     <a-entity id="target" mindar-image-target="targetIndex:0">
       <a-entity id="arHolder" position="0 0 0">
-        <a-entity id="arModel" gltf-model="#witchHouse"></a-entity>
+        <a-entity id="arModel"></a-entity>
       </a-entity>
     </a-entity>
 
-    <!-- Exploração -->
     <a-entity id="exploreRoot" visible="false" position="0 0 -3">
       <a-entity id="exploreHolder">
-        <a-entity id="exploreModel" gltf-model="#witchHouse"></a-entity>
+        <a-entity id="exploreModel"></a-entity>
       </a-entity>
     </a-entity>
 
     <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
   </a-scene>
 
-<script>
-const panel = document.getElementById('panel');
-const statusEl = document.getElementById('status');
-const target = document.getElementById('target');
-const arModel = document.getElementById('arModel');
-const arHolder = document.getElementById('arHolder');
-const exploreRoot = document.getElementById('exploreRoot');
-const exploreHolder = document.getElementById('exploreHolder');
-const exploreModel = document.getElementById('exploreModel');
-const exploreBtn = document.getElementById('exploreBtn');
-const backBtn = document.getElementById('backBtn');
+  <script>
+    const MODEL_URL = "./Casa_da_bruxa_web.glb";
 
-let targetSeen = false;
-let exploreMode = false;
-let fitted = false;
+    const scene = document.getElementById("scene");
+    const target = document.getElementById("target");
 
-let rotX = 0;
-let rotY = 0;
-let exploreScaleMultiplier = 1;
+    const arModel = document.getElementById("arModel");
+    const arHolder = document.getElementById("arHolder");
 
-let dragging = false;
-let lastX = 0;
-let lastY = 0;
-let lastPinch = null;
+    const exploreRoot = document.getElementById("exploreRoot");
+    const exploreModel = document.getElementById("exploreModel");
+    const exploreHolder = document.getElementById("exploreHolder");
 
-function log(msg){
-  panel.textContent += "\\n" + msg;
-  panel.scrollTop = panel.scrollHeight;
-}
+    const statusEl = document.getElementById("status");
+    const debugEl = document.getElementById("debug");
+    const exploreBtn = document.getElementById("exploreBtn");
+    const backBtn = document.getElementById("backBtn");
 
-function setStatus(msg){
-  statusEl.textContent = msg;
-}
+    let modelRequested = false;
+    let modelLoadedAR = false;
+    let modelLoadedExplore = false;
+    let targetSeen = false;
+    let exploreMode = false;
 
-function fitObject(el, holder, mode){
-  const mesh = el.getObject3D('mesh');
-  if (!mesh) {
-    log(mode + ': mesh ainda não disponível.');
-    return null;
-  }
+    let rotX = 0;
+    let rotY = 0;
+    let zoomMultiplier = 1;
 
-  mesh.updateMatrixWorld(true);
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastPinch = null;
 
-  const box = new THREE.Box3().setFromObject(mesh);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
+    let exploreBaseScale = 1;
 
-  const maxDim = Math.max(size.x, size.y, size.z);
+    function log(msg){
+      debugEl.textContent += "\\n" + msg;
+      debugEl.scrollTop = debugEl.scrollHeight;
+    }
 
-  log(`${mode}: tamanho original x=${size.x.toFixed(3)} y=${size.y.toFixed(3)} z=${size.z.toFixed(3)}`);
-  log(`${mode}: centro original x=${center.x.toFixed(3)} y=${center.y.toFixed(3)} z=${center.z.toFixed(3)}`);
-  log(`${mode}: maior dimensão=${maxDim.toFixed(3)}`);
+    function setStatus(msg){
+      statusEl.textContent = msg;
+    }
 
-  if (!isFinite(maxDim) || maxDim <= 0) {
-    log(mode + ': caixa inválida.');
-    return null;
-  }
+    function forceVideoVisible(){
+      document.querySelectorAll("video").forEach(video => {
+        video.setAttribute("playsinline","");
+        video.setAttribute("autoplay","");
+        video.muted = true;
 
-  // Centraliza a malha no holder.
-  el.object3D.position.set(
-    -center.x,
-    -center.y,
-    -center.z
-  );
+        Object.assign(video.style,{
+          position:"fixed",
+          inset:"0",
+          width:"100vw",
+          height:"100vh",
+          objectFit:"cover",
+          zIndex:"0",
+          opacity:"1",
+          visibility:"visible",
+          display:"block"
+        });
 
-  // Recalcula após centralizar.
-  mesh.updateMatrixWorld(true);
+        if(video.paused){
+          video.play().catch(()=>{});
+        }
+      });
+    }
 
-  // Tamanho alvo diferente para AR e Explorar.
-  const desiredSize = mode === 'AR' ? 0.85 : 2.0;
-  const scale = desiredSize / maxDim;
+    setInterval(forceVideoVisible,600);
 
-  holder.object3D.scale.set(scale, scale, scale);
+    function fitModel(el, holder, desiredSize, label){
+      const mesh = el.getObject3D("mesh");
+      if(!mesh){
+        log(label + ": mesh indisponível.");
+        return;
+      }
 
-  // Leve ajuste vertical para "assentar" o modelo.
-  if (mode === 'AR') {
-    holder.object3D.position.set(0, 0.02, 0);
-    holder.object3D.rotation.set(THREE.MathUtils.degToRad(-8), 0, 0);
-  } else {
-    holder.object3D.position.set(0, -0.15, 0);
-    holder.object3D.rotation.set(0, 0, 0);
-  }
+      mesh.updateMatrixWorld(true);
 
-  log(`${mode}: escala automática=${scale.toFixed(6)}`);
-  return scale;
-}
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
 
-function runFitWhenReady(){
-  if (fitted) return;
+      box.getSize(size);
+      box.getCenter(center);
 
-  const arMesh = arModel.getObject3D('mesh');
-  const exMesh = exploreModel.getObject3D('mesh');
+      const maxDim = Math.max(size.x,size.y,size.z);
 
-  if (!arMesh || !exMesh) {
-    setTimeout(runFitWhenReady, 300);
-    return;
-  }
+      log(
+        label +
+        ": tamanho " +
+        size.x.toFixed(2) + " x " +
+        size.y.toFixed(2) + " x " +
+        size.z.toFixed(2)
+      );
 
-  const arScale = fitObject(arModel, arHolder, 'AR');
-  const exScale = fitObject(exploreModel, exploreHolder, 'EXPLORE');
+      if(!isFinite(maxDim) || maxDim <= 0){
+        log(label + ": dimensões inválidas.");
+        return;
+      }
 
-  if (arScale && exScale) {
-    fitted = true;
-    setStatus('Modelo carregado. Aponte para a imagem do bosque.');
-    log('Modelo centralizado e escalado automaticamente.');
-  }
-}
+      el.object3D.position.set(
+        -center.x,
+        -center.y,
+        -center.z
+      );
 
-arModel.addEventListener('model-loaded', () => {
-  log('AR: model-loaded');
-  runFitWhenReady();
-});
+      const scale = desiredSize / maxDim;
+      holder.object3D.scale.set(scale,scale,scale);
 
-exploreModel.addEventListener('model-loaded', () => {
-  log('EXPLORE: model-loaded');
-  runFitWhenReady();
-});
+      if(label === "AR"){
+        holder.object3D.position.set(0,0.03,0);
+        holder.object3D.rotation.set(
+          THREE.MathUtils.degToRad(-8),
+          0,
+          0
+        );
+      }else{
+        holder.object3D.position.set(0,-0.12,0);
+        exploreBaseScale = scale;
+      }
 
-arModel.addEventListener('model-error', e => {
-  log('AR: model-error');
-  setStatus('Erro ao carregar casa_da_bruxa.glb');
-  console.error(e);
-});
+      log(label + ": escala automática " + scale.toFixed(6));
+    }
 
-exploreModel.addEventListener('model-error', e => {
-  log('EXPLORE: model-error');
-  console.error(e);
-});
+    function loadModelAfterARReady(){
+      if(modelRequested) return;
+      modelRequested = true;
 
-target.addEventListener('targetFound', () => {
-  targetSeen = true;
-  log('Alvo encontrado.');
-  if (!exploreMode) {
-    exploreBtn.style.display = 'block';
-    setStatus('Bosque encontrado!');
-  }
-});
+      log("Solicitando GLB depois do AR pronto...");
+      setStatus("Câmera pronta. Carregando o cenário...");
 
-target.addEventListener('targetLost', () => {
-  targetSeen = false;
-  log('Alvo perdido.');
-  if (!exploreMode) {
-    exploreBtn.style.display = 'none';
-    setStatus('Aponte novamente para a imagem.');
-  }
-});
+      arModel.setAttribute("gltf-model", MODEL_URL);
+      exploreModel.setAttribute("gltf-model", MODEL_URL);
+    }
 
-exploreBtn.addEventListener('click', () => {
-  if (!fitted) {
-    setStatus('Aguarde o modelo terminar de carregar.');
-    return;
-  }
+    scene.addEventListener("arReady", () => {
+      log("AR pronto. Câmera iniciada.");
+      setStatus("Aponte para a imagem do Bosque da Bruxa");
 
-  exploreMode = true;
-  target.setAttribute('visible', false);
-  exploreRoot.setAttribute('visible', true);
-
-  exploreBtn.style.display = 'none';
-  backBtn.style.display = 'block';
-  setStatus('Arraste para girar • pinça para zoom');
-  log('Modo explorar ativado.');
-});
-
-backBtn.addEventListener('click', () => {
-  exploreMode = false;
-  exploreRoot.setAttribute('visible', false);
-  target.setAttribute('visible', true);
-
-  backBtn.style.display = 'none';
-  exploreBtn.style.display = targetSeen ? 'block' : 'none';
-  setStatus(targetSeen ? 'Bosque encontrado!' : 'Aponte para a imagem.');
-  log('Voltou ao modo AR.');
-});
-
-function applyExploreTransform(){
-  exploreHolder.object3D.rotation.set(
-    THREE.MathUtils.degToRad(rotX),
-    THREE.MathUtils.degToRad(rotY),
-    0
-  );
-
-  const base = exploreHolder.object3D.scale.x;
-  const targetScale = base * exploreScaleMultiplier;
-  exploreHolder.object3D.scale.set(targetScale, targetScale, targetScale);
-}
-
-window.addEventListener('pointerdown', e => {
-  if (!exploreMode) return;
-  if (e.target === backBtn || e.target === exploreBtn) return;
-
-  dragging = true;
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
-
-window.addEventListener('pointermove', e => {
-  if (!exploreMode || !dragging) return;
-
-  const dx = e.clientX - lastX;
-  const dy = e.clientY - lastY;
-
-  rotY += dx * 0.45;
-  rotX += dy * 0.25;
-  rotX = Math.max(-60, Math.min(60, rotX));
-
-  lastX = e.clientX;
-  lastY = e.clientY;
-
-  applyExploreTransform();
-});
-
-window.addEventListener('pointerup', () => dragging = false);
-window.addEventListener('pointercancel', () => dragging = false);
-
-window.addEventListener('touchstart', e => {
-  if (!exploreMode) return;
-
-  if (e.touches.length === 2) {
-    const a = e.touches[0];
-    const b = e.touches[1];
-    lastPinch = Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY);
-  }
-}, {passive:false});
-
-window.addEventListener('touchmove', e => {
-  if (!exploreMode || e.touches.length !== 2) return;
-
-  e.preventDefault();
-
-  const a = e.touches[0];
-  const b = e.touches[1];
-  const d = Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY);
-
-  if (lastPinch) {
-    exploreScaleMultiplier *= d / lastPinch;
-    exploreScaleMultiplier = Math.max(0.25, Math.min(4.0, exploreScaleMultiplier));
-    applyExploreTransform();
-  }
-
-  lastPinch = d;
-}, {passive:false});
-
-window.addEventListener('touchend', () => lastPinch = null);
-
-function forceVideoVisible(){
-  document.querySelectorAll('video').forEach(v => {
-    v.setAttribute('playsinline','');
-    v.setAttribute('autoplay','');
-    v.muted = true;
-    Object.assign(v.style,{
-      position:'fixed',
-      inset:'0',
-      width:'100vw',
-      height:'100vh',
-      objectFit:'cover',
-      zIndex:'0',
-      opacity:'1',
-      visibility:'visible',
-      display:'block'
+      // Espera um pouco para a câmera estabilizar, só depois pede o GLB.
+      setTimeout(loadModelAfterARReady, 700);
     });
-    if (v.paused) v.play().catch(()=>{});
-  });
-}
-setInterval(forceVideoVisible, 600);
 
-document.getElementById('scene').addEventListener('arReady', () => {
-  log('AR pronto.');
-  if (!fitted) setStatus('AR pronto. Carregando o modelo...');
-});
+    scene.addEventListener("arError", () => {
+      log("Erro ao iniciar AR/câmera.");
+      setStatus("Erro ao iniciar câmera/AR.");
+    });
 
-document.getElementById('scene').addEventListener('arError', () => {
-  log('Erro no AR/câmera.');
-  setStatus('Erro ao iniciar câmera/AR.');
-});
-</script>
+    arModel.addEventListener("model-loaded", () => {
+      modelLoadedAR = true;
+      log("AR: model-loaded");
+      fitModel(arModel, arHolder, 0.85, "AR");
+
+      if(targetSeen && !exploreMode){
+        setStatus("Bosque encontrado!");
+      }
+    });
+
+    exploreModel.addEventListener("model-loaded", () => {
+      modelLoadedExplore = true;
+      log("EXPLORE: model-loaded");
+      fitModel(exploreModel, exploreHolder, 2.0, "EXPLORE");
+    });
+
+    arModel.addEventListener("model-error", (event) => {
+      log("AR: model-error");
+      setStatus("Erro ao carregar o GLB.");
+      console.error(event);
+    });
+
+    exploreModel.addEventListener("model-error", (event) => {
+      log("EXPLORE: model-error");
+      console.error(event);
+    });
+
+    target.addEventListener("targetFound", () => {
+      targetSeen = true;
+      log("Alvo encontrado.");
+
+      if(!exploreMode){
+        if(modelLoadedAR){
+          setStatus("Bosque encontrado!");
+        }else{
+          setStatus("Imagem encontrada. Carregando cenário...");
+        }
+
+        if(modelLoadedExplore){
+          exploreBtn.style.display = "block";
+        }
+      }
+    });
+
+    target.addEventListener("targetLost", () => {
+      targetSeen = false;
+      log("Alvo perdido.");
+
+      if(!exploreMode){
+        exploreBtn.style.display = "none";
+        setStatus("Aponte novamente para a imagem.");
+      }
+    });
+
+    exploreBtn.addEventListener("click", () => {
+      if(!modelLoadedExplore){
+        setStatus("Aguarde o cenário terminar de carregar.");
+        return;
+      }
+
+      exploreMode = true;
+      target.setAttribute("visible", false);
+      exploreRoot.setAttribute("visible", true);
+
+      exploreBtn.style.display = "none";
+      backBtn.style.display = "block";
+
+      setStatus("Arraste para girar • pinça para zoom");
+      log("Modo explorar ativado.");
+    });
+
+    backBtn.addEventListener("click", () => {
+      exploreMode = false;
+      exploreRoot.setAttribute("visible", false);
+      target.setAttribute("visible", true);
+
+      backBtn.style.display = "none";
+
+      if(targetSeen && modelLoadedExplore){
+        exploreBtn.style.display = "block";
+      }
+
+      setStatus(
+        targetSeen
+          ? "Bosque encontrado!"
+          : "Aponte para a imagem."
+      );
+
+      log("Voltou ao modo AR.");
+    });
+
+    function applyExploreTransform(){
+      exploreHolder.object3D.rotation.set(
+        THREE.MathUtils.degToRad(rotX),
+        THREE.MathUtils.degToRad(rotY),
+        0
+      );
+
+      const s = exploreBaseScale * zoomMultiplier;
+
+      exploreHolder.object3D.scale.set(
+        s,
+        s,
+        s
+      );
+    }
+
+    window.addEventListener("pointerdown", event => {
+      if(!exploreMode) return;
+
+      if(
+        event.target === exploreBtn ||
+        event.target === backBtn
+      ){
+        return;
+      }
+
+      dragging = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+    });
+
+    window.addEventListener("pointermove", event => {
+      if(!exploreMode || !dragging) return;
+
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+
+      rotY += dx * 0.45;
+      rotX += dy * 0.25;
+
+      rotX = Math.max(
+        -60,
+        Math.min(60, rotX)
+      );
+
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      applyExploreTransform();
+    });
+
+    window.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+
+    window.addEventListener("pointercancel", () => {
+      dragging = false;
+    });
+
+    window.addEventListener("touchstart", event => {
+      if(!exploreMode) return;
+
+      if(event.touches.length === 2){
+        const a = event.touches[0];
+        const b = event.touches[1];
+
+        lastPinch = Math.hypot(
+          b.clientX-a.clientX,
+          b.clientY-a.clientY
+        );
+      }
+    },{passive:false});
+
+    window.addEventListener("touchmove", event => {
+      if(!exploreMode) return;
+      if(event.touches.length !== 2) return;
+
+      event.preventDefault();
+
+      const a = event.touches[0];
+      const b = event.touches[1];
+
+      const distance = Math.hypot(
+        b.clientX-a.clientX,
+        b.clientY-a.clientY
+      );
+
+      if(lastPinch){
+        zoomMultiplier *= distance / lastPinch;
+
+        zoomMultiplier = Math.max(
+          0.25,
+          Math.min(4.0, zoomMultiplier)
+        );
+
+        applyExploreTransform();
+      }
+
+      lastPinch = distance;
+    },{passive:false});
+
+    window.addEventListener("touchend", () => {
+      lastPinch = null;
+    });
+  </script>
 </body>
 </html>
