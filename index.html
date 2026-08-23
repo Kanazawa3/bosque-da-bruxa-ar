@@ -1,66 +1,499 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Bosque da Bruxa AR</title>
-<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-<style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;object-fit:cover!important;z-index:0!important;opacity:1!important;visibility:visible!important;display:block!important;background:#000}
-a-scene,.a-canvas{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:2!important;background:transparent!important}
-.mindar-ui-overlay{z-index:5!important}
-#ui{position:fixed;inset:0;z-index:20;pointer-events:none}
-#status{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.66);padding:10px 14px;border-radius:999px;font-size:13px;white-space:nowrap;backdrop-filter:blur(8px)}
-#exploreBtn,#backBtn{position:absolute;top:16px;padding:11px 15px;border:0;border-radius:999px;font-weight:700;font-size:14px;pointer-events:auto;box-shadow:0 4px 16px rgba(0,0,0,.28)}
-#exploreBtn{right:14px;background:#fff;color:#111;display:none}
-#backBtn{left:14px;background:rgba(0,0,0,.68);color:#fff;display:none}
-#hint{position:absolute;top:70px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.58);padding:8px 12px;border-radius:999px;font-size:12px;display:none;white-space:nowrap;backdrop-filter:blur(8px)}
-.hidden{display:none!important}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Bosque da Bruxa AR</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      touch-action: none;
+    }
+
+    video {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: 0 !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: block !important;
+      background: #000;
+    }
+
+    a-scene,
+    .a-canvas {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 2 !important;
+      background: transparent !important;
+    }
+
+    .mindar-ui-overlay {
+      z-index: 5 !important;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    #status {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      color: #fff;
+      background: rgba(0, 0, 0, 0.66);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    #exploreBtn,
+    #backBtn {
+      position: absolute;
+      top: 16px;
+      padding: 11px 15px;
+      border: 0;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 14px;
+      pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    }
+
+    #exploreBtn {
+      right: 14px;
+      background: #fff;
+      color: #111;
+      display: none;
+    }
+
+    #backBtn {
+      left: 14px;
+      background: rgba(0, 0, 0, 0.68);
+      color: #fff;
+      display: none;
+    }
+
+    #exploreHint {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      background: rgba(0, 0, 0, 0.58);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      display: none;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
 </head>
+
 <body>
-<div id="ui">
-<button id="backBtn">← Voltar ao AR</button>
-<button id="exploreBtn">Explorar em 3D</button>
-<div id="hint">1 dedo gira • 2 dedos dão zoom</div>
-<div id="status">Aponte a câmera para a imagem do Bosque da Bruxa</div>
-</div>
-<a-scene id="scene" mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;" embedded vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false" renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
-<a-assets timeout="60000">
-<a-asset-item id="witchHouse" src="./Casa%20da%20bruxa.glb"></a-asset-item>
-</a-assets>
-<a-entity light="type:ambient; color:#ffffff; intensity:1.25"></a-entity>
-<a-entity light="type:directional; color:#ffe7c0; intensity:1.2" position="-2 4 3"></a-entity>
-<a-entity id="target" mindar-image-target="targetIndex:0">
-<a-entity id="arModel" gltf-model="#witchHouse" position="0 0.05 0" rotation="-8 0 0" scale="0.35 0.35 0.35"></a-entity>
-</a-entity>
-<a-entity id="exploreRoot" visible="false" position="0 -0.15 -3">
-<a-entity id="exploreModel" gltf-model="#witchHouse" position="0 -0.35 0" rotation="0 0 0" scale="0.55 0.55 0.55"></a-entity>
-</a-entity>
-<a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
-</a-scene>
-<script>
-const target=document.querySelector('#target'), exploreRoot=document.querySelector('#exploreRoot'), exploreModel=document.querySelector('#exploreModel');
-const status=document.querySelector('#status'), exploreBtn=document.querySelector('#exploreBtn'), backBtn=document.querySelector('#backBtn'), hint=document.querySelector('#hint');
-let targetSeen=false, exploreMode=false, rotX=0, rotY=0, scale=.55, dragging=false, lastX=0, lastY=0, lastPinch=null;
-function setStatus(t){status.textContent=t}
-function update(){exploreModel.setAttribute('rotation',`${rotX} ${rotY} 0`);exploreModel.setAttribute('scale',`${scale} ${scale} ${scale}`)}
-function enterExplore(){if(!targetSeen)return;exploreMode=true;target.setAttribute('visible',false);exploreRoot.setAttribute('visible',true);exploreBtn.style.display='none';backBtn.style.display='block';hint.style.display='block';status.classList.add('hidden');update()}
-function exitExplore(){exploreMode=false;exploreRoot.setAttribute('visible',false);target.setAttribute('visible',true);backBtn.style.display='none';hint.style.display='none';status.classList.remove('hidden');if(targetSeen){exploreBtn.style.display='block';setStatus('Bosque encontrado!')}else{exploreBtn.style.display='none';setStatus('Aponte a câmera para a imagem do Bosque da Bruxa')}}
-exploreBtn.onclick=enterExplore;backBtn.onclick=exitExplore;
-target.addEventListener('targetFound',()=>{targetSeen=true;if(!exploreMode){exploreBtn.style.display='block';status.classList.remove('hidden');setStatus('Bosque encontrado! Toque em “Explorar em 3D”.')}});
-target.addEventListener('targetLost',()=>{targetSeen=false;if(!exploreMode){exploreBtn.style.display='none';status.classList.remove('hidden');setStatus('Aponte novamente para a imagem do Bosque da Bruxa')}});
-setInterval(()=>document.querySelectorAll('video').forEach(v=>{v.setAttribute('playsinline','');v.setAttribute('autoplay','');v.muted=true;Object.assign(v.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',objectFit:'cover',zIndex:'0',display:'block',opacity:'1',visibility:'visible'});if(v.paused)v.play().catch(()=>{})}),700);
-window.addEventListener('pointerdown',e=>{if(!exploreMode||e.target===exploreBtn||e.target===backBtn)return;dragging=true;lastX=e.clientX;lastY=e.clientY});
-window.addEventListener('pointermove',e=>{if(!exploreMode||!dragging)return;rotY+=(e.clientX-lastX)*.45;rotX+=(e.clientY-lastY)*.25;rotX=Math.max(-45,Math.min(45,rotX));lastX=e.clientX;lastY=e.clientY;update()});
-window.addEventListener('pointerup',()=>dragging=false);window.addEventListener('pointercancel',()=>dragging=false);
-window.addEventListener('touchstart',e=>{if(!exploreMode)return;if(e.touches.length===2){const a=e.touches[0],b=e.touches[1];lastPinch=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}},{passive:false});
-window.addEventListener('touchmove',e=>{if(!exploreMode||e.touches.length!==2)return;e.preventDefault();const a=e.touches[0],b=e.touches[1],d=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);if(lastPinch){scale*=d/lastPinch;scale=Math.max(.18,Math.min(1.6,scale));update()}lastPinch=d},{passive:false});
-window.addEventListener('touchend',()=>lastPinch=null);
-document.querySelector('#scene').addEventListener('arReady',()=>setStatus('Aponte a câmera para a imagem do Bosque da Bruxa'));
-document.querySelector('#scene').addEventListener('arError',()=>setStatus('Não foi possível iniciar a câmera.'));
-</script>
+
+  <div id="ui">
+    <button id="backBtn">← Voltar ao AR</button>
+    <button id="exploreBtn">Explorar em 3D</button>
+    <div id="exploreHint">1 dedo gira • 2 dedos dão zoom</div>
+    <div id="status">Aponte a câmera para a imagem do Bosque da Bruxa</div>
+  </div>
+
+  <a-scene
+    id="scene"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
+    embedded
+    vr-mode-ui="enabled:false"
+    device-orientation-permission-ui="enabled:false"
+    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true"
+  >
+
+    <a-assets timeout="60000">
+      <a-asset-item
+        id="witchHouse"
+        src="./casa_da_bruxa.glb"
+      ></a-asset-item>
+    </a-assets>
+
+    <a-entity
+      light="type: ambient; color: #ffffff; intensity: 1.25"
+    ></a-entity>
+
+    <a-entity
+      light="type: directional; color: #ffe7c0; intensity: 1.2"
+      position="-2 4 3"
+    ></a-entity>
+
+    <a-entity
+      id="target"
+      mindar-image-target="targetIndex: 0"
+    >
+
+      <a-entity
+        id="arModel"
+        gltf-model="#witchHouse"
+        position="0 0.05 0"
+        rotation="-8 0 0"
+        scale="0.05 0.05 0.05"
+      ></a-entity>
+
+    </a-entity>
+
+    <a-entity
+      id="exploreRoot"
+      visible="false"
+      position="0 -0.15 -3"
+    >
+
+      <a-entity
+        id="exploreModel"
+        gltf-model="#witchHouse"
+        position="0 -0.35 0"
+        rotation="0 0 0"
+        scale="0.08 0.08 0.08"
+      ></a-entity>
+
+    </a-entity>
+
+    <a-camera
+      id="camera"
+      position="0 0 0"
+      look-controls="enabled:false"
+    ></a-camera>
+
+  </a-scene>
+
+  <script>
+    const scene = document.querySelector("#scene");
+    const target = document.querySelector("#target");
+    const exploreRoot = document.querySelector("#exploreRoot");
+    const exploreModel = document.querySelector("#exploreModel");
+
+    const status = document.querySelector("#status");
+    const exploreBtn = document.querySelector("#exploreBtn");
+    const backBtn = document.querySelector("#backBtn");
+    const exploreHint = document.querySelector("#exploreHint");
+
+    let targetSeen = false;
+    let exploreMode = false;
+
+    let rotX = 0;
+    let rotY = 0;
+    let modelScale = 0.08;
+
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastPinchDistance = null;
+
+    function setStatus(text) {
+      status.textContent = text;
+    }
+
+    function updateExploreTransform() {
+      exploreModel.setAttribute(
+        "rotation",
+        `${rotX} ${rotY} 0`
+      );
+
+      exploreModel.setAttribute(
+        "scale",
+        `${modelScale} ${modelScale} ${modelScale}`
+      );
+    }
+
+    function enterExploreMode() {
+      if (!targetSeen) return;
+
+      exploreMode = true;
+
+      target.setAttribute("visible", false);
+      exploreRoot.setAttribute("visible", true);
+
+      exploreBtn.style.display = "none";
+      backBtn.style.display = "block";
+      exploreHint.style.display = "block";
+      status.classList.add("hidden");
+
+      updateExploreTransform();
+    }
+
+    function exitExploreMode() {
+      exploreMode = false;
+
+      exploreRoot.setAttribute("visible", false);
+      target.setAttribute("visible", true);
+
+      backBtn.style.display = "none";
+      exploreHint.style.display = "none";
+
+      if (targetSeen) {
+        exploreBtn.style.display = "block";
+        status.classList.remove("hidden");
+        setStatus("Bosque encontrado!");
+      } else {
+        exploreBtn.style.display = "none";
+        status.classList.remove("hidden");
+        setStatus("Aponte a câmera para a imagem do Bosque da Bruxa");
+      }
+    }
+
+    exploreBtn.addEventListener(
+      "click",
+      enterExploreMode
+    );
+
+    backBtn.addEventListener(
+      "click",
+      exitExploreMode
+    );
+
+    target.addEventListener(
+      "targetFound",
+      () => {
+        targetSeen = true;
+
+        if (!exploreMode) {
+          exploreBtn.style.display = "block";
+          status.classList.remove("hidden");
+          setStatus("Bosque encontrado! Toque em “Explorar em 3D”.");
+        }
+      }
+    );
+
+    target.addEventListener(
+      "targetLost",
+      () => {
+        targetSeen = false;
+
+        if (!exploreMode) {
+          exploreBtn.style.display = "none";
+          status.classList.remove("hidden");
+          setStatus("Aponte novamente para a imagem do Bosque da Bruxa");
+        }
+      }
+    );
+
+    function forceVideoVisible() {
+      document
+        .querySelectorAll("video")
+        .forEach((video) => {
+          video.setAttribute("playsinline", "");
+          video.setAttribute("autoplay", "");
+          video.muted = true;
+
+          Object.assign(
+            video.style,
+            {
+              position: "fixed",
+              inset: "0",
+              width: "100vw",
+              height: "100vh",
+              objectFit: "cover",
+              zIndex: "0",
+              display: "block",
+              opacity: "1",
+              visibility: "visible"
+            }
+          );
+
+          if (video.paused) {
+            video.play().catch(() => {});
+          }
+        });
+    }
+
+    setInterval(
+      forceVideoVisible,
+      700
+    );
+
+    window.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!exploreMode) return;
+
+        if (
+          event.target === exploreBtn ||
+          event.target === backBtn
+        ) {
+          return;
+        }
+
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+      }
+    );
+
+    window.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!exploreMode || !dragging) return;
+
+        const dx = event.clientX - lastX;
+        const dy = event.clientY - lastY;
+
+        rotY += dx * 0.45;
+        rotX += dy * 0.25;
+
+        rotX = Math.max(
+          -45,
+          Math.min(45, rotX)
+        );
+
+        lastX = event.clientX;
+        lastY = event.clientY;
+
+        updateExploreTransform();
+      }
+    );
+
+    window.addEventListener(
+      "pointerup",
+      () => {
+        dragging = false;
+      }
+    );
+
+    window.addEventListener(
+      "pointercancel",
+      () => {
+        dragging = false;
+      }
+    );
+
+    window.addEventListener(
+      "touchstart",
+      (event) => {
+        if (!exploreMode) return;
+
+        if (event.touches.length === 2) {
+          const a = event.touches[0];
+          const b = event.touches[1];
+
+          lastPinchDistance = Math.hypot(
+            b.clientX - a.clientX,
+            b.clientY - a.clientY
+          );
+        }
+      },
+      {
+        passive: false
+      }
+    );
+
+    window.addEventListener(
+      "touchmove",
+      (event) => {
+        if (!exploreMode) return;
+
+        if (event.touches.length === 2) {
+          event.preventDefault();
+
+          const a = event.touches[0];
+          const b = event.touches[1];
+
+          const distance = Math.hypot(
+            b.clientX - a.clientX,
+            b.clientY - a.clientY
+          );
+
+          if (lastPinchDistance) {
+            const ratio =
+              distance / lastPinchDistance;
+
+            modelScale *= ratio;
+
+            modelScale = Math.max(
+              0.02,
+              Math.min(0.40, modelScale)
+            );
+
+            updateExploreTransform();
+          }
+
+          lastPinchDistance = distance;
+        }
+      },
+      {
+        passive: false
+      }
+    );
+
+    window.addEventListener(
+      "touchend",
+      () => {
+        lastPinchDistance = null;
+      }
+    );
+
+    scene.addEventListener(
+      "arReady",
+      () => {
+        setStatus("Aponte a câmera para a imagem do Bosque da Bruxa");
+      }
+    );
+
+    scene.addEventListener(
+      "arError",
+      () => {
+        setStatus("Não foi possível iniciar a câmera.");
+      }
+    );
+
+    ["arModel", "exploreModel"].forEach(
+      (id) => {
+        const element =
+          document.getElementById(id);
+
+        element.addEventListener(
+          "model-loaded",
+          () => {
+            const mesh =
+              element.getObject3D("mesh");
+
+            if (!mesh) return;
+
+            mesh.traverse(
+              (node) => {
+                if (node.isMesh) {
+                  node.castShadow = true;
+                  node.receiveShadow = true;
+                }
+              }
+            );
+          }
+        );
+      }
+    );
+  </script>
 </body>
 </html>
