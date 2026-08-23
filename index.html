@@ -2,129 +2,105 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Bosque da Bruxa AR</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Bosque da Bruxa AR - Diagnóstico</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html,
-    body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      touch-action: none;
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      touch-action:none;
     }
 
-    video {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: cover !important;
-      z-index: 0 !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      display: block !important;
-      background: #000;
+    video{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      object-fit:cover !important;
+      z-index:0 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+      display:block !important;
+      background:#000;
     }
 
-    a-scene,
-    .a-canvas {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: 2 !important;
-      background: transparent !important;
+    a-scene,.a-canvas{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      z-index:2 !important;
+      background:transparent !important;
     }
 
-    .mindar-ui-overlay {
-      z-index: 5 !important;
+    .mindar-ui-overlay{z-index:5 !important}
+
+    #panel{
+      position:fixed;
+      left:8px;
+      right:8px;
+      top:8px;
+      z-index:30;
+      color:#fff;
+      background:rgba(0,0,0,.72);
+      border-radius:12px;
+      padding:10px 12px;
+      font-size:12px;
+      line-height:1.45;
+      pointer-events:none;
+      backdrop-filter:blur(8px);
+      max-height:38vh;
+      overflow:auto;
+      white-space:pre-wrap;
     }
 
-    #ui {
-      position: fixed;
-      inset: 0;
-      z-index: 20;
-      pointer-events: none;
+    #status{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      z-index:30;
+      color:#fff;
+      background:rgba(0,0,0,.68);
+      padding:9px 14px;
+      border-radius:999px;
+      font-size:13px;
+      white-space:nowrap;
+      pointer-events:none;
     }
 
-    #status {
-      position: absolute;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      color: #fff;
-      background: rgba(0, 0, 0, 0.66);
-      padding: 10px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      white-space: nowrap;
-      backdrop-filter: blur(8px);
-      pointer-events: none;
+    #exploreBtn,#backBtn{
+      position:fixed;
+      top:16px;
+      z-index:40;
+      border:0;
+      border-radius:999px;
+      padding:11px 15px;
+      font-weight:700;
+      pointer-events:auto;
+      display:none;
     }
 
-    #exploreBtn,
-    #backBtn {
-      position: absolute;
-      top: 16px;
-      padding: 11px 15px;
-      border: 0;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 14px;
-      pointer-events: auto;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
-    }
+    #exploreBtn{right:14px;background:#fff;color:#111}
+    #backBtn{left:14px;background:rgba(0,0,0,.72);color:#fff}
 
-    #exploreBtn {
-      right: 14px;
-      background: #fff;
-      color: #111;
-      display: none;
-    }
-
-    #backBtn {
-      left: 14px;
-      background: rgba(0, 0, 0, 0.68);
-      color: #fff;
-      display: none;
-    }
-
-    #exploreHint {
-      position: absolute;
-      top: 70px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #fff;
-      background: rgba(0, 0, 0, 0.58);
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      display: none;
-      white-space: nowrap;
-      backdrop-filter: blur(8px);
-    }
-
-    .hidden {
-      display: none !important;
-    }
+    .hidden{display:none !important}
   </style>
 </head>
-
 <body>
 
-  <div id="ui">
-    <button id="backBtn">← Voltar ao AR</button>
-    <button id="exploreBtn">Explorar em 3D</button>
-    <div id="exploreHint">1 dedo gira • 2 dedos dão zoom</div>
-    <div id="status">Aponte a câmera para a imagem do Bosque da Bruxa</div>
-  </div>
+  <div id="panel">Diagnóstico iniciado...</div>
+  <button id="backBtn">← Voltar ao AR</button>
+  <button id="exploreBtn">Explorar em 3D</button>
+  <div id="status">Carregando modelo...</div>
 
   <a-scene
     id="scene"
@@ -132,368 +108,308 @@
     embedded
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false"
-    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true"
-  >
+    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
 
-    <a-assets timeout="60000">
-      <a-asset-item
-        id="witchHouse"
-        src="./casa_da_bruxa.glb"
-      ></a-asset-item>
+    <a-assets timeout="90000">
+      <a-asset-item id="witchHouse" src="./casa_da_bruxa.glb"></a-asset-item>
     </a-assets>
 
-    <a-entity
-      light="type: ambient; color: #ffffff; intensity: 1.25"
-    ></a-entity>
+    <a-entity light="type:ambient; intensity:1.5; color:#ffffff"></a-entity>
+    <a-entity light="type:directional; intensity:1.4; color:#ffe8c2" position="-2 4 3"></a-entity>
 
-    <a-entity
-      light="type: directional; color: #ffe7c0; intensity: 1.2"
-      position="-2 4 3"
-    ></a-entity>
-
-    <a-entity
-      id="target"
-      mindar-image-target="targetIndex: 0"
-    >
-
-      <a-entity
-        id="arModel"
-        gltf-model="#witchHouse"
-        position="0 0.05 0"
-        rotation="-8 0 0"
-        scale="0.05 0.05 0.05"
-      ></a-entity>
-
+    <!-- AR -->
+    <a-entity id="target" mindar-image-target="targetIndex:0">
+      <a-entity id="arHolder" position="0 0 0">
+        <a-entity id="arModel" gltf-model="#witchHouse"></a-entity>
+      </a-entity>
     </a-entity>
 
-    <a-entity
-      id="exploreRoot"
-      visible="false"
-      position="0 -0.15 -3"
-    >
-
-      <a-entity
-        id="exploreModel"
-        gltf-model="#witchHouse"
-        position="0 -0.35 0"
-        rotation="0 0 0"
-        scale="0.08 0.08 0.08"
-      ></a-entity>
-
+    <!-- Exploração -->
+    <a-entity id="exploreRoot" visible="false" position="0 0 -3">
+      <a-entity id="exploreHolder">
+        <a-entity id="exploreModel" gltf-model="#witchHouse"></a-entity>
+      </a-entity>
     </a-entity>
 
-    <a-camera
-      id="camera"
-      position="0 0 0"
-      look-controls="enabled:false"
-    ></a-camera>
-
+    <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
   </a-scene>
 
-  <script>
-    const scene = document.querySelector("#scene");
-    const target = document.querySelector("#target");
-    const exploreRoot = document.querySelector("#exploreRoot");
-    const exploreModel = document.querySelector("#exploreModel");
+<script>
+const panel = document.getElementById('panel');
+const statusEl = document.getElementById('status');
+const target = document.getElementById('target');
+const arModel = document.getElementById('arModel');
+const arHolder = document.getElementById('arHolder');
+const exploreRoot = document.getElementById('exploreRoot');
+const exploreHolder = document.getElementById('exploreHolder');
+const exploreModel = document.getElementById('exploreModel');
+const exploreBtn = document.getElementById('exploreBtn');
+const backBtn = document.getElementById('backBtn');
 
-    const status = document.querySelector("#status");
-    const exploreBtn = document.querySelector("#exploreBtn");
-    const backBtn = document.querySelector("#backBtn");
-    const exploreHint = document.querySelector("#exploreHint");
+let targetSeen = false;
+let exploreMode = false;
+let fitted = false;
 
-    let targetSeen = false;
-    let exploreMode = false;
+let rotX = 0;
+let rotY = 0;
+let exploreScaleMultiplier = 1;
 
-    let rotX = 0;
-    let rotY = 0;
-    let modelScale = 0.08;
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+let lastPinch = null;
 
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    let lastPinchDistance = null;
+function log(msg){
+  panel.textContent += "\\n" + msg;
+  panel.scrollTop = panel.scrollHeight;
+}
 
-    function setStatus(text) {
-      status.textContent = text;
-    }
+function setStatus(msg){
+  statusEl.textContent = msg;
+}
 
-    function updateExploreTransform() {
-      exploreModel.setAttribute(
-        "rotation",
-        `${rotX} ${rotY} 0`
-      );
+function fitObject(el, holder, mode){
+  const mesh = el.getObject3D('mesh');
+  if (!mesh) {
+    log(mode + ': mesh ainda não disponível.');
+    return null;
+  }
 
-      exploreModel.setAttribute(
-        "scale",
-        `${modelScale} ${modelScale} ${modelScale}`
-      );
-    }
+  mesh.updateMatrixWorld(true);
 
-    function enterExploreMode() {
-      if (!targetSeen) return;
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
 
-      exploreMode = true;
+  const maxDim = Math.max(size.x, size.y, size.z);
 
-      target.setAttribute("visible", false);
-      exploreRoot.setAttribute("visible", true);
+  log(`${mode}: tamanho original x=${size.x.toFixed(3)} y=${size.y.toFixed(3)} z=${size.z.toFixed(3)}`);
+  log(`${mode}: centro original x=${center.x.toFixed(3)} y=${center.y.toFixed(3)} z=${center.z.toFixed(3)}`);
+  log(`${mode}: maior dimensão=${maxDim.toFixed(3)}`);
 
-      exploreBtn.style.display = "none";
-      backBtn.style.display = "block";
-      exploreHint.style.display = "block";
-      status.classList.add("hidden");
+  if (!isFinite(maxDim) || maxDim <= 0) {
+    log(mode + ': caixa inválida.');
+    return null;
+  }
 
-      updateExploreTransform();
-    }
+  // Centraliza a malha no holder.
+  el.object3D.position.set(
+    -center.x,
+    -center.y,
+    -center.z
+  );
 
-    function exitExploreMode() {
-      exploreMode = false;
+  // Recalcula após centralizar.
+  mesh.updateMatrixWorld(true);
 
-      exploreRoot.setAttribute("visible", false);
-      target.setAttribute("visible", true);
+  // Tamanho alvo diferente para AR e Explorar.
+  const desiredSize = mode === 'AR' ? 0.85 : 2.0;
+  const scale = desiredSize / maxDim;
 
-      backBtn.style.display = "none";
-      exploreHint.style.display = "none";
+  holder.object3D.scale.set(scale, scale, scale);
 
-      if (targetSeen) {
-        exploreBtn.style.display = "block";
-        status.classList.remove("hidden");
-        setStatus("Bosque encontrado!");
-      } else {
-        exploreBtn.style.display = "none";
-        status.classList.remove("hidden");
-        setStatus("Aponte a câmera para a imagem do Bosque da Bruxa");
-      }
-    }
+  // Leve ajuste vertical para "assentar" o modelo.
+  if (mode === 'AR') {
+    holder.object3D.position.set(0, 0.02, 0);
+    holder.object3D.rotation.set(THREE.MathUtils.degToRad(-8), 0, 0);
+  } else {
+    holder.object3D.position.set(0, -0.15, 0);
+    holder.object3D.rotation.set(0, 0, 0);
+  }
 
-    exploreBtn.addEventListener(
-      "click",
-      enterExploreMode
-    );
+  log(`${mode}: escala automática=${scale.toFixed(6)}`);
+  return scale;
+}
 
-    backBtn.addEventListener(
-      "click",
-      exitExploreMode
-    );
+function runFitWhenReady(){
+  if (fitted) return;
 
-    target.addEventListener(
-      "targetFound",
-      () => {
-        targetSeen = true;
+  const arMesh = arModel.getObject3D('mesh');
+  const exMesh = exploreModel.getObject3D('mesh');
 
-        if (!exploreMode) {
-          exploreBtn.style.display = "block";
-          status.classList.remove("hidden");
-          setStatus("Bosque encontrado! Toque em “Explorar em 3D”.");
-        }
-      }
-    );
+  if (!arMesh || !exMesh) {
+    setTimeout(runFitWhenReady, 300);
+    return;
+  }
 
-    target.addEventListener(
-      "targetLost",
-      () => {
-        targetSeen = false;
+  const arScale = fitObject(arModel, arHolder, 'AR');
+  const exScale = fitObject(exploreModel, exploreHolder, 'EXPLORE');
 
-        if (!exploreMode) {
-          exploreBtn.style.display = "none";
-          status.classList.remove("hidden");
-          setStatus("Aponte novamente para a imagem do Bosque da Bruxa");
-        }
-      }
-    );
+  if (arScale && exScale) {
+    fitted = true;
+    setStatus('Modelo carregado. Aponte para a imagem do bosque.');
+    log('Modelo centralizado e escalado automaticamente.');
+  }
+}
 
-    function forceVideoVisible() {
-      document
-        .querySelectorAll("video")
-        .forEach((video) => {
-          video.setAttribute("playsinline", "");
-          video.setAttribute("autoplay", "");
-          video.muted = true;
+arModel.addEventListener('model-loaded', () => {
+  log('AR: model-loaded');
+  runFitWhenReady();
+});
 
-          Object.assign(
-            video.style,
-            {
-              position: "fixed",
-              inset: "0",
-              width: "100vw",
-              height: "100vh",
-              objectFit: "cover",
-              zIndex: "0",
-              display: "block",
-              opacity: "1",
-              visibility: "visible"
-            }
-          );
+exploreModel.addEventListener('model-loaded', () => {
+  log('EXPLORE: model-loaded');
+  runFitWhenReady();
+});
 
-          if (video.paused) {
-            video.play().catch(() => {});
-          }
-        });
-    }
+arModel.addEventListener('model-error', e => {
+  log('AR: model-error');
+  setStatus('Erro ao carregar casa_da_bruxa.glb');
+  console.error(e);
+});
 
-    setInterval(
-      forceVideoVisible,
-      700
-    );
+exploreModel.addEventListener('model-error', e => {
+  log('EXPLORE: model-error');
+  console.error(e);
+});
 
-    window.addEventListener(
-      "pointerdown",
-      (event) => {
-        if (!exploreMode) return;
+target.addEventListener('targetFound', () => {
+  targetSeen = true;
+  log('Alvo encontrado.');
+  if (!exploreMode) {
+    exploreBtn.style.display = 'block';
+    setStatus('Bosque encontrado!');
+  }
+});
 
-        if (
-          event.target === exploreBtn ||
-          event.target === backBtn
-        ) {
-          return;
-        }
+target.addEventListener('targetLost', () => {
+  targetSeen = false;
+  log('Alvo perdido.');
+  if (!exploreMode) {
+    exploreBtn.style.display = 'none';
+    setStatus('Aponte novamente para a imagem.');
+  }
+});
 
-        dragging = true;
-        lastX = event.clientX;
-        lastY = event.clientY;
-      }
-    );
+exploreBtn.addEventListener('click', () => {
+  if (!fitted) {
+    setStatus('Aguarde o modelo terminar de carregar.');
+    return;
+  }
 
-    window.addEventListener(
-      "pointermove",
-      (event) => {
-        if (!exploreMode || !dragging) return;
+  exploreMode = true;
+  target.setAttribute('visible', false);
+  exploreRoot.setAttribute('visible', true);
 
-        const dx = event.clientX - lastX;
-        const dy = event.clientY - lastY;
+  exploreBtn.style.display = 'none';
+  backBtn.style.display = 'block';
+  setStatus('Arraste para girar • pinça para zoom');
+  log('Modo explorar ativado.');
+});
 
-        rotY += dx * 0.45;
-        rotX += dy * 0.25;
+backBtn.addEventListener('click', () => {
+  exploreMode = false;
+  exploreRoot.setAttribute('visible', false);
+  target.setAttribute('visible', true);
 
-        rotX = Math.max(
-          -45,
-          Math.min(45, rotX)
-        );
+  backBtn.style.display = 'none';
+  exploreBtn.style.display = targetSeen ? 'block' : 'none';
+  setStatus(targetSeen ? 'Bosque encontrado!' : 'Aponte para a imagem.');
+  log('Voltou ao modo AR.');
+});
 
-        lastX = event.clientX;
-        lastY = event.clientY;
+function applyExploreTransform(){
+  exploreHolder.object3D.rotation.set(
+    THREE.MathUtils.degToRad(rotX),
+    THREE.MathUtils.degToRad(rotY),
+    0
+  );
 
-        updateExploreTransform();
-      }
-    );
+  const base = exploreHolder.object3D.scale.x;
+  const targetScale = base * exploreScaleMultiplier;
+  exploreHolder.object3D.scale.set(targetScale, targetScale, targetScale);
+}
 
-    window.addEventListener(
-      "pointerup",
-      () => {
-        dragging = false;
-      }
-    );
+window.addEventListener('pointerdown', e => {
+  if (!exploreMode) return;
+  if (e.target === backBtn || e.target === exploreBtn) return;
 
-    window.addEventListener(
-      "pointercancel",
-      () => {
-        dragging = false;
-      }
-    );
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
 
-    window.addEventListener(
-      "touchstart",
-      (event) => {
-        if (!exploreMode) return;
+window.addEventListener('pointermove', e => {
+  if (!exploreMode || !dragging) return;
 
-        if (event.touches.length === 2) {
-          const a = event.touches[0];
-          const b = event.touches[1];
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
 
-          lastPinchDistance = Math.hypot(
-            b.clientX - a.clientX,
-            b.clientY - a.clientY
-          );
-        }
-      },
-      {
-        passive: false
-      }
-    );
+  rotY += dx * 0.45;
+  rotX += dy * 0.25;
+  rotX = Math.max(-60, Math.min(60, rotX));
 
-    window.addEventListener(
-      "touchmove",
-      (event) => {
-        if (!exploreMode) return;
+  lastX = e.clientX;
+  lastY = e.clientY;
 
-        if (event.touches.length === 2) {
-          event.preventDefault();
+  applyExploreTransform();
+});
 
-          const a = event.touches[0];
-          const b = event.touches[1];
+window.addEventListener('pointerup', () => dragging = false);
+window.addEventListener('pointercancel', () => dragging = false);
 
-          const distance = Math.hypot(
-            b.clientX - a.clientX,
-            b.clientY - a.clientY
-          );
+window.addEventListener('touchstart', e => {
+  if (!exploreMode) return;
 
-          if (lastPinchDistance) {
-            const ratio =
-              distance / lastPinchDistance;
+  if (e.touches.length === 2) {
+    const a = e.touches[0];
+    const b = e.touches[1];
+    lastPinch = Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY);
+  }
+}, {passive:false});
 
-            modelScale *= ratio;
+window.addEventListener('touchmove', e => {
+  if (!exploreMode || e.touches.length !== 2) return;
 
-            modelScale = Math.max(
-              0.02,
-              Math.min(0.40, modelScale)
-            );
+  e.preventDefault();
 
-            updateExploreTransform();
-          }
+  const a = e.touches[0];
+  const b = e.touches[1];
+  const d = Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY);
 
-          lastPinchDistance = distance;
-        }
-      },
-      {
-        passive: false
-      }
-    );
+  if (lastPinch) {
+    exploreScaleMultiplier *= d / lastPinch;
+    exploreScaleMultiplier = Math.max(0.25, Math.min(4.0, exploreScaleMultiplier));
+    applyExploreTransform();
+  }
 
-    window.addEventListener(
-      "touchend",
-      () => {
-        lastPinchDistance = null;
-      }
-    );
+  lastPinch = d;
+}, {passive:false});
 
-    scene.addEventListener(
-      "arReady",
-      () => {
-        setStatus("Aponte a câmera para a imagem do Bosque da Bruxa");
-      }
-    );
+window.addEventListener('touchend', () => lastPinch = null);
 
-    scene.addEventListener(
-      "arError",
-      () => {
-        setStatus("Não foi possível iniciar a câmera.");
-      }
-    );
+function forceVideoVisible(){
+  document.querySelectorAll('video').forEach(v => {
+    v.setAttribute('playsinline','');
+    v.setAttribute('autoplay','');
+    v.muted = true;
+    Object.assign(v.style,{
+      position:'fixed',
+      inset:'0',
+      width:'100vw',
+      height:'100vh',
+      objectFit:'cover',
+      zIndex:'0',
+      opacity:'1',
+      visibility:'visible',
+      display:'block'
+    });
+    if (v.paused) v.play().catch(()=>{});
+  });
+}
+setInterval(forceVideoVisible, 600);
 
-    ["arModel", "exploreModel"].forEach(
-      (id) => {
-        const element =
-          document.getElementById(id);
+document.getElementById('scene').addEventListener('arReady', () => {
+  log('AR pronto.');
+  if (!fitted) setStatus('AR pronto. Carregando o modelo...');
+});
 
-        element.addEventListener(
-          "model-loaded",
-          () => {
-            const mesh =
-              element.getObject3D("mesh");
-
-            if (!mesh) return;
-
-            mesh.traverse(
-              (node) => {
-                if (node.isMesh) {
-                  node.castShadow = true;
-                  node.receiveShadow = true;
-                }
-              }
-            );
-          }
-        );
-      }
-    );
-  </script>
+document.getElementById('scene').addEventListener('arError', () => {
+  log('Erro no AR/câmera.');
+  setStatus('Erro ao iniciar câmera/AR.');
+});
+</script>
 </body>
 </html>
