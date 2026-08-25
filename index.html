@@ -516,72 +516,135 @@ function applyExploreTransform(){
   exploreHolder.object3D.scale.set(s,s,s);
 }
 
+// CONTROLES DO MODO EXPLORAR
+// 1 dedo = girar
+// 2 dedos = zoom
+const activePointers = new Map();
+let dragPointerId = null;
+let lastDragX = 0;
+let lastDragY = 0;
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+
+function getPinchDistance(){
+  if(activePointers.size < 2) return 0;
+
+  const points = Array.from(activePointers.values());
+  const a = points[0];
+  const b = points[1];
+
+  return Math.hypot(
+    b.x - a.x,
+    b.y - a.y
+  );
+}
+
+function prepareSinglePointerDrag(){
+  if(activePointers.size !== 1){
+    dragPointerId = null;
+    return;
+  }
+
+  const entry = activePointers.entries().next().value;
+
+  dragPointerId = entry[0];
+  lastDragX = entry[1].x;
+  lastDragY = entry[1].y;
+}
+
 window.addEventListener("pointerdown",event=>{
   if(!exploreMode) return;
-  if(event.target === backBtn || event.target === exploreBtn) return;
+  if(event.target === backBtn || event.target === exploreBtn || event.target === retryBtn) return;
 
-  dragging = true;
-  lastX = event.clientX;
-  lastY = event.clientY;
-});
+  if(event.cancelable) event.preventDefault();
 
-window.addEventListener("pointermove",event=>{
-  if(!exploreMode || !dragging) return;
+  activePointers.set(event.pointerId,{
+    x:event.clientX,
+    y:event.clientY
+  });
 
-  const dx = event.clientX - lastX;
-  const dy = event.clientY - lastY;
+  try{
+    event.target.setPointerCapture?.(event.pointerId);
+  }catch(e){}
 
-  rotY += dx * 0.45;
-  rotX += dy * 0.25;
-
-  rotX = Math.max(-60,Math.min(60,rotX));
-
-  lastX = event.clientX;
-  lastY = event.clientY;
-
-  applyExploreTransform();
-});
-
-window.addEventListener("pointerup",()=>dragging=false);
-window.addEventListener("pointercancel",()=>dragging=false);
-
-window.addEventListener("touchstart",event=>{
-  if(!exploreMode) return;
-
-  if(event.touches.length === 2){
-    const a = event.touches[0];
-    const b = event.touches[1];
-
-    lastPinch = Math.hypot(
-      b.clientX-a.clientX,
-      b.clientY-a.clientY
-    );
+  if(activePointers.size === 1){
+    dragPointerId = event.pointerId;
+    lastDragX = event.clientX;
+    lastDragY = event.clientY;
+  }else if(activePointers.size === 2){
+    dragPointerId = null;
+    pinchStartDistance = getPinchDistance();
+    pinchStartZoom = zoomMultiplier;
   }
 },{passive:false});
 
-window.addEventListener("touchmove",event=>{
-  if(!exploreMode || event.touches.length !== 2) return;
+window.addEventListener("pointermove",event=>{
+  if(!exploreMode || !activePointers.has(event.pointerId)) return;
+
+  if(event.cancelable) event.preventDefault();
+
+  activePointers.set(event.pointerId,{
+    x:event.clientX,
+    y:event.clientY
+  });
+
+  if(activePointers.size >= 2){
+    const distance = getPinchDistance();
+
+    if(pinchStartDistance > 0 && distance > 0){
+      zoomMultiplier = pinchStartZoom * (distance / pinchStartDistance);
+      zoomMultiplier = Math.max(0.25,Math.min(5,zoomMultiplier));
+      applyExploreTransform();
+    }
+
+    return;
+  }
+
+  if(activePointers.size === 1 && dragPointerId === event.pointerId){
+    const dx = event.clientX - lastDragX;
+    const dy = event.clientY - lastDragY;
+
+    rotY += dx * 0.45;
+    rotX += dy * 0.25;
+    rotX = Math.max(-60,Math.min(60,rotX));
+
+    lastDragX = event.clientX;
+    lastDragY = event.clientY;
+
+    applyExploreTransform();
+  }
+},{passive:false});
+
+function releasePointer(event){
+  activePointers.delete(event.pointerId);
+
+  try{
+    event.target.releasePointerCapture?.(event.pointerId);
+  }catch(e){}
+
+  if(activePointers.size < 2){
+    pinchStartDistance = 0;
+    pinchStartZoom = zoomMultiplier;
+  }
+
+  prepareSinglePointerDrag();
+}
+
+window.addEventListener("pointerup",releasePointer,{passive:false});
+window.addEventListener("pointercancel",releasePointer,{passive:false});
+
+// Permite testar o zoom no computador usando a roda do mouse.
+window.addEventListener("wheel",event=>{
+  if(!exploreMode) return;
 
   event.preventDefault();
 
-  const a = event.touches[0];
-  const b = event.touches[1];
+  const factor = event.deltaY < 0 ? 1.08 : 0.92;
+  zoomMultiplier *= factor;
+  zoomMultiplier = Math.max(0.25,Math.min(5,zoomMultiplier));
 
-  const d = Math.hypot(
-    b.clientX-a.clientX,
-    b.clientY-a.clientY
-  );
-
-  if(lastPinch){
-    zoomMultiplier *= d / lastPinch;
-    zoomMultiplier = Math.max(0.25,Math.min(4,zoomMultiplier));
-    applyExploreTransform();
-  }
-
-  lastPinch = d;
+  applyExploreTransform();
 },{passive:false});
-
-window.addEventListener("touchend",()=>lastPinch=null);
 </script>
 </body>
 </html>
