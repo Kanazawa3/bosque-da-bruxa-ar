@@ -131,13 +131,7 @@
     <a-entity light="type:ambient; intensity:1.55; color:#ffffff"></a-entity>
     <a-entity light="type:directional; intensity:1.35; color:#ffe8c2" position="-2 4 3"></a-entity>
 
-    <a-entity id="target" mindar-image-target="targetIndex:0"></a-entity>
-
-    <!--
-      O modelo AR fica fora do target bruto.
-      Copiamos a posição/rotação do target com suavização para reduzir tremedeira.
-    -->
-    <a-entity id="arSmoothRoot" visible="false">
+    <a-entity id="target" mindar-image-target="targetIndex:0">
       <a-entity id="arHolder">
         <a-entity id="arModel"></a-entity>
       </a-entity>
@@ -157,7 +151,6 @@ const MODEL_PATH = "./Casa_da_bruxa_web.glb";
 
 const scene = document.getElementById("scene");
 const target = document.getElementById("target");
-const arSmoothRoot = document.getElementById("arSmoothRoot");
 
 const arModel = document.getElementById("arModel");
 const arHolder = document.getElementById("arHolder");
@@ -186,22 +179,10 @@ let rotX = 0;
 let rotY = 0;
 let zoomMultiplier = 1;
 let exploreBaseScale = 1;
-
-// Controle de toque unificado: 1 dedo gira, 2 dedos dão zoom.
-const activePointers = new Map();
-let dragPointerId = null;
-let lastDragX = 0;
-let lastDragY = 0;
-let pinchStartDistance = 0;
-let pinchStartZoom = 1;
-
-// Suavização do rastreamento AR.
-// Valores menores deixam mais estável, mas um pouco mais "macio" ao mover a câmera.
-const TRACK_POS_SMOOTH = 0.16;
-const TRACK_ROT_SMOOTH = 0.12;
-const TRACK_SCALE_SMOOTH = 0.16;
-let smoothInitialized = false;
-let hideARTimeout = null;
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+let lastPinch = null;
 
 function log(msg){
   debugEl.textContent += "\n" + msg;
@@ -402,54 +383,6 @@ function fitModel(el,holder,desiredSize,label){
   return true;
 }
 
-
-function updateSmoothedAR(){
-  requestAnimationFrame(updateSmoothedAR);
-
-  if(!targetSeen || exploreMode || !modelReady) return;
-
-  const source = target.object3D;
-  const dest = arSmoothRoot.object3D;
-
-  if(!source || !dest) return;
-
-  if(!smoothInitialized){
-    dest.position.copy(source.position);
-    dest.quaternion.copy(source.quaternion);
-    dest.scale.copy(source.scale);
-    smoothInitialized = true;
-    return;
-  }
-
-  dest.position.lerp(source.position, TRACK_POS_SMOOTH);
-  dest.quaternion.slerp(source.quaternion, TRACK_ROT_SMOOTH);
-  dest.scale.lerp(source.scale, TRACK_SCALE_SMOOTH);
-}
-
-updateSmoothedAR();
-
-function pointerDistance(){
-  if(activePointers.size < 2) return 0;
-
-  const pts = Array.from(activePointers.values());
-  const a = pts[0];
-  const b = pts[1];
-
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function resetSinglePointerDrag(){
-  if(activePointers.size !== 1){
-    dragPointerId = null;
-    return;
-  }
-
-  const [id, point] = activePointers.entries().next().value;
-  dragPointerId = id;
-  lastDragX = point.x;
-  lastDragY = point.y;
-}
-
 function checkReady(){
   const arOK = !!arModel.getObject3D("mesh");
   const exOK = !!exploreModel.getObject3D("mesh");
@@ -513,16 +446,7 @@ target.addEventListener("targetFound",()=>{
   targetSeen = true;
   log("Alvo encontrado.");
 
-  if(hideARTimeout){
-    clearTimeout(hideARTimeout);
-    hideARTimeout = null;
-  }
-
-  smoothInitialized = false;
-
   if(!exploreMode){
-    arSmoothRoot.setAttribute("visible",true);
-
     if(modelReady){
       setStatus("Bosque encontrado!");
       exploreBtn.style.display = "block";
@@ -538,14 +462,6 @@ target.addEventListener("targetLost",()=>{
 
   if(!exploreMode){
     exploreBtn.style.display = "none";
-
-    // Pequeno atraso evita piscar quando o rastreamento perde o alvo por poucos frames.
-    hideARTimeout = setTimeout(()=>{
-      if(!targetSeen && !exploreMode){
-        arSmoothRoot.setAttribute("visible",false);
-        smoothInitialized = false;
-      }
-    },220);
 
     if(modelReady){
       setStatus("Aponte novamente para a imagem.");
@@ -563,13 +479,8 @@ exploreBtn.addEventListener("click",()=>{
 
   exploreMode = true;
 
-  arSmoothRoot.setAttribute("visible",false);
+  target.setAttribute("visible",false);
   exploreRoot.setAttribute("visible",true);
-
-  // Começa o modo explorar com zoom neutro.
-  activePointers.clear();
-  dragPointerId = null;
-  pinchStartDistance = 0;
 
   exploreBtn.style.display = "none";
   backBtn.style.display = "block";
@@ -581,17 +492,14 @@ backBtn.addEventListener("click",()=>{
   exploreMode = false;
 
   exploreRoot.setAttribute("visible",false);
-  activePointers.clear();
-  dragPointerId = null;
-  pinchStartDistance = 0;
+  target.setAttribute("visible",true);
+
+  backBtn.style.display = "none";
 
   if(targetSeen && modelReady){
-    smoothInitialized = false;
-    arSmoothRoot.setAttribute("visible",true);
     exploreBtn.style.display = "block";
     setStatus("Bosque encontrado!");
   }else{
-    arSmoothRoot.setAttribute("visible",false);
     setStatus("Aponte para a imagem.");
   }
 });
@@ -610,89 +518,70 @@ function applyExploreTransform(){
 
 window.addEventListener("pointerdown",event=>{
   if(!exploreMode) return;
-  if(event.target === backBtn || event.target === exploreBtn || event.target === retryBtn) return;
+  if(event.target === backBtn || event.target === exploreBtn) return;
 
-  if(event.cancelable) event.preventDefault();
-
-  activePointers.set(event.pointerId,{
-    x:event.clientX,
-    y:event.clientY
-  });
-
-  if(activePointers.size === 1){
-    dragPointerId = event.pointerId;
-    lastDragX = event.clientX;
-    lastDragY = event.clientY;
-  }else if(activePointers.size === 2){
-    dragPointerId = null;
-    pinchStartDistance = pointerDistance();
-    pinchStartZoom = zoomMultiplier;
-  }
-},{passive:false});
+  dragging = true;
+  lastX = event.clientX;
+  lastY = event.clientY;
+});
 
 window.addEventListener("pointermove",event=>{
-  if(!exploreMode || !activePointers.has(event.pointerId)) return;
+  if(!exploreMode || !dragging) return;
 
-  if(event.cancelable) event.preventDefault();
+  const dx = event.clientX - lastX;
+  const dy = event.clientY - lastY;
 
-  activePointers.set(event.pointerId,{
-    x:event.clientX,
-    y:event.clientY
-  });
+  rotY += dx * 0.45;
+  rotX += dy * 0.25;
 
-  if(activePointers.size >= 2){
-    const d = pointerDistance();
+  rotX = Math.max(-60,Math.min(60,rotX));
 
-    if(pinchStartDistance > 0 && d > 0){
-      zoomMultiplier = pinchStartZoom * (d / pinchStartDistance);
-      zoomMultiplier = Math.max(0.30,Math.min(5.0,zoomMultiplier));
-      applyExploreTransform();
-    }
+  lastX = event.clientX;
+  lastY = event.clientY;
 
-    return;
-  }
+  applyExploreTransform();
+});
 
-  if(activePointers.size === 1 && dragPointerId === event.pointerId){
-    const dx = event.clientX - lastDragX;
-    const dy = event.clientY - lastDragY;
+window.addEventListener("pointerup",()=>dragging=false);
+window.addEventListener("pointercancel",()=>dragging=false);
 
-    rotY += dx * 0.45;
-    rotX += dy * 0.25;
-    rotX = Math.max(-60,Math.min(60,rotX));
+window.addEventListener("touchstart",event=>{
+  if(!exploreMode) return;
 
-    lastDragX = event.clientX;
-    lastDragY = event.clientY;
+  if(event.touches.length === 2){
+    const a = event.touches[0];
+    const b = event.touches[1];
 
-    applyExploreTransform();
+    lastPinch = Math.hypot(
+      b.clientX-a.clientX,
+      b.clientY-a.clientY
+    );
   }
 },{passive:false});
 
-function releasePointer(event){
-  activePointers.delete(event.pointerId);
-
-  if(activePointers.size < 2){
-    pinchStartDistance = 0;
-    pinchStartZoom = zoomMultiplier;
-  }
-
-  resetSinglePointerDrag();
-}
-
-window.addEventListener("pointerup",releasePointer,{passive:false});
-window.addEventListener("pointercancel",releasePointer,{passive:false});
-
-// Zoom com roda do mouse no computador, útil para testar sem celular.
-window.addEventListener("wheel",event=>{
-  if(!exploreMode) return;
+window.addEventListener("touchmove",event=>{
+  if(!exploreMode || event.touches.length !== 2) return;
 
   event.preventDefault();
 
-  const factor = event.deltaY < 0 ? 1.08 : 0.92;
-  zoomMultiplier *= factor;
-  zoomMultiplier = Math.max(0.30,Math.min(5.0,zoomMultiplier));
+  const a = event.touches[0];
+  const b = event.touches[1];
 
-  applyExploreTransform();
+  const d = Math.hypot(
+    b.clientX-a.clientX,
+    b.clientY-a.clientY
+  );
+
+  if(lastPinch){
+    zoomMultiplier *= d / lastPinch;
+    zoomMultiplier = Math.max(0.25,Math.min(4,zoomMultiplier));
+    applyExploreTransform();
+  }
+
+  lastPinch = d;
 },{passive:false});
+
+window.addEventListener("touchend",()=>lastPinch=null);
 </script>
 </body>
 </html>
