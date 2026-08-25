@@ -184,6 +184,10 @@ let lastX = 0;
 let lastY = 0;
 let lastPinch = null;
 
+// Estado usado somente pelo zoom com dois dedos.
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+
 function log(msg){
   debugEl.textContent += "\n" + msg;
   debugEl.scrollTop = debugEl.scrollHeight;
@@ -552,36 +556,58 @@ window.addEventListener("touchstart",event=>{
     const a = event.touches[0];
     const b = event.touches[1];
 
-    lastPinch = Math.hypot(
-      b.clientX-a.clientX,
-      b.clientY-a.clientY
+    pinchStartDistance = Math.hypot(
+      b.clientX - a.clientX,
+      b.clientY - a.clientY
     );
+
+    pinchStartZoom = zoomMultiplier;
+
+    if(event.cancelable){
+      event.preventDefault();
+    }
   }
 },{passive:false});
 
 window.addEventListener("touchmove",event=>{
   if(!exploreMode || event.touches.length !== 2) return;
 
-  event.preventDefault();
+  if(event.cancelable){
+    event.preventDefault();
+  }
 
   const a = event.touches[0];
   const b = event.touches[1];
 
-  const d = Math.hypot(
-    b.clientX-a.clientX,
-    b.clientY-a.clientY
+  const currentDistance = Math.hypot(
+    b.clientX - a.clientX,
+    b.clientY - a.clientY
   );
 
-  if(lastPinch){
-    zoomMultiplier *= d / lastPinch;
-    zoomMultiplier = Math.max(0.25,Math.min(4,zoomMultiplier));
+  if(pinchStartDistance > 0){
+    zoomMultiplier =
+      pinchStartZoom * (currentDistance / pinchStartDistance);
+
+    zoomMultiplier = Math.max(
+      0.25,
+      Math.min(5, zoomMultiplier)
+    );
+
     applyExploreTransform();
   }
-
-  lastPinch = d;
 },{passive:false});
 
-window.addEventListener("touchend",()=>lastPinch=null);
+window.addEventListener("touchend",event=>{
+  if(event.touches.length < 2){
+    pinchStartDistance = 0;
+    pinchStartZoom = zoomMultiplier;
+  }
+},{passive:false});
+
+window.addEventListener("touchcancel",()=>{
+  pinchStartDistance = 0;
+  pinchStartZoom = zoomMultiplier;
+},{passive:false});
 </script>
 </body>
 </html>
