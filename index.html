@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Bosque da Bruxa AR - GLB Diagnóstico</title>
+  <title>Bosque da Bruxa AR</title>
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -16,7 +16,6 @@
       overflow:hidden;
       background:#000;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      touch-action:none;
     }
 
     video{
@@ -41,25 +40,8 @@
       background:transparent !important;
     }
 
-    .mindar-ui-overlay{z-index:5 !important}
-
-    #debug{
-      position:fixed;
-      left:8px;
-      right:8px;
-      top:8px;
-      z-index:30;
-      color:#fff;
-      background:rgba(0,0,0,.72);
-      padding:9px 11px;
-      border-radius:10px;
-      font-size:11px;
-      line-height:1.4;
-      white-space:pre-wrap;
-      pointer-events:none;
-      max-height:32vh;
-      overflow:auto;
-      backdrop-filter:blur(8px);
+    .mindar-ui-overlay{
+      z-index:5 !important;
     }
 
     #status{
@@ -67,7 +49,7 @@
       left:50%;
       bottom:18px;
       transform:translateX(-50%);
-      z-index:30;
+      z-index:50;
       color:#fff;
       background:rgba(0,0,0,.68);
       padding:10px 14px;
@@ -76,47 +58,88 @@
       white-space:nowrap;
       backdrop-filter:blur(8px);
       pointer-events:none;
+      max-width:88vw;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    #retryBtn,#exploreBtn,#backBtn{
+    #exploreBtn,#backBtn,#retryBtn{
       position:fixed;
       top:16px;
-      z-index:40;
+      z-index:60;
       border:0;
       border-radius:999px;
       padding:11px 15px;
       font-weight:700;
       font-size:14px;
-      pointer-events:auto;
       display:none;
+      touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;
     }
 
-    #retryBtn{
-      right:14px;
-      background:#ffdf6c;
-      color:#111;
-    }
-
-    #exploreBtn{
+    #exploreBtn,#retryBtn{
       right:14px;
       background:#fff;
       color:#111;
     }
 
+    #retryBtn{
+      background:#ffdf6c;
+    }
+
     #backBtn{
       left:14px;
-      background:rgba(0,0,0,.75);
+      background:rgba(0,0,0,.78);
       color:#fff;
+    }
+
+    /*
+      Esta camada só existe no modo Explorar.
+      Assim o giro/zoom não interfere com o AR nem com os botões.
+    */
+    #touchLayer{
+      position:fixed;
+      inset:0;
+      z-index:30;
+      display:none;
+      touch-action:none;
+      background:transparent;
+    }
+
+    /*
+      Diagnóstico fica escondido por padrão.
+      Para mostrar, abra a página com ?debug=1 no final do endereço.
+    */
+    #debug{
+      display:none;
+      position:fixed;
+      left:8px;
+      right:8px;
+      top:70px;
+      z-index:80;
+      color:#fff;
+      background:rgba(0,0,0,.78);
+      padding:9px 11px;
+      border-radius:10px;
+      font-size:11px;
+      line-height:1.4;
+      white-space:pre-wrap;
+      pointer-events:none;
+      max-height:35vh;
+      overflow:auto;
+      backdrop-filter:blur(8px);
     }
   </style>
 </head>
 
 <body>
-
   <div id="debug">Página carregada.</div>
-  <button id="retryBtn">Tentar GLB novamente</button>
+
+  <button id="retryBtn">Tentar novamente</button>
   <button id="exploreBtn">Explorar em 3D</button>
   <button id="backBtn">← Voltar ao AR</button>
+
+  <div id="touchLayer"></div>
   <div id="status">Iniciando câmera...</div>
 
   <a-scene
@@ -130,12 +153,14 @@
     <a-entity light="type:ambient; intensity:1.55; color:#ffffff"></a-entity>
     <a-entity light="type:directional; intensity:1.35; color:#ffe8c2" position="-2 4 3"></a-entity>
 
+    <!-- AR: estrutura simples e igual ao que já funcionava -->
     <a-entity id="target" mindar-image-target="targetIndex:0">
       <a-entity id="arHolder">
         <a-entity id="arModel"></a-entity>
       </a-entity>
     </a-entity>
 
+    <!-- Explorar 3D: modelo separado do alvo -->
     <a-entity id="exploreRoot" visible="false" position="0 0 -3">
       <a-entity id="exploreHolder">
         <a-entity id="exploreModel"></a-entity>
@@ -158,14 +183,17 @@ const exploreRoot = document.getElementById("exploreRoot");
 const exploreModel = document.getElementById("exploreModel");
 const exploreHolder = document.getElementById("exploreHolder");
 
-const debugEl = document.getElementById("debug");
 const statusEl = document.getElementById("status");
+const debugEl = document.getElementById("debug");
 
-const retryBtn = document.getElementById("retryBtn");
 const exploreBtn = document.getElementById("exploreBtn");
 const backBtn = document.getElementById("backBtn");
+const retryBtn = document.getElementById("retryBtn");
+const touchLayer = document.getElementById("touchLayer");
 
-let arReady = false;
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+if(DEBUG) debugEl.style.display = "block";
+
 let modelReady = false;
 let modelLoading = false;
 let targetSeen = false;
@@ -174,26 +202,40 @@ let exploreMode = false;
 let blobUrl = null;
 let controller = null;
 
+let exploreBaseScale = 1;
+let zoomMultiplier = 1;
 let rotX = 0;
 let rotY = 0;
-let zoomMultiplier = 1;
-let exploreBaseScale = 1;
-let dragging = false;
-let lastX = 0;
-let lastY = 0;
-let lastPinch = null;
+
+// Touch
+let lastTouchX = 0;
+let lastTouchY = 0;
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+
+// Mouse (teste no PC)
+let mouseDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
 
 function log(msg){
-  debugEl.textContent += "\n" + msg;
-  debugEl.scrollTop = debugEl.scrollHeight;
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent += "\n" + msg;
+    debugEl.scrollTop = debugEl.scrollHeight;
+  }
 }
 
 function setStatus(msg){
   statusEl.textContent = msg;
 }
 
+function humanMB(bytes){
+  return (bytes / 1024 / 1024).toFixed(2) + " MB";
+}
+
 function forceVideoVisible(){
-  document.querySelectorAll("video").forEach(video => {
+  document.querySelectorAll("video").forEach(video=>{
     video.setAttribute("playsinline","");
     video.setAttribute("autoplay","");
     video.muted = true;
@@ -215,13 +257,10 @@ function forceVideoVisible(){
     }
   });
 }
+
 setInterval(forceVideoVisible,600);
 
-function humanMB(bytes){
-  return (bytes / 1024 / 1024).toFixed(2) + " MB";
-}
-
-async function fetchModelAsBlob(){
+async function loadModel(){
   if(modelLoading || modelReady) return;
 
   modelLoading = true;
@@ -232,13 +271,12 @@ async function fetchModelAsBlob(){
   }
 
   controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  const timeout = setTimeout(()=>controller.abort(),90000);
 
   const url = MODEL_PATH + "?v=" + Date.now();
 
   try{
-    log("GLB: iniciando fetch");
-    log("GLB URL: " + url);
+    log("GLB: iniciando download");
     setStatus("Baixando cenário 3D...");
 
     const response = await fetch(url,{
@@ -246,25 +284,19 @@ async function fetchModelAsBlob(){
       signal:controller.signal
     });
 
-    log("GLB HTTP: " + response.status + " " + response.statusText);
-    log("Content-Type: " + (response.headers.get("content-type") || "(sem content-type)"));
+    log("GLB HTTP: " + response.status);
 
     if(!response.ok){
       throw new Error("HTTP " + response.status);
     }
 
     const total = Number(response.headers.get("content-length")) || 0;
-
-    if(total){
-      log("GLB tamanho informado: " + humanMB(total));
-    }else{
-      log("GLB sem Content-Length informado.");
-    }
+    if(total) log("GLB tamanho: " + humanMB(total));
 
     const reader = response.body.getReader();
     const chunks = [];
     let received = 0;
-    let lastUi = 0;
+    let lastUI = 0;
 
     while(true){
       const {done,value} = await reader.read();
@@ -274,13 +306,12 @@ async function fetchModelAsBlob(){
       received += value.byteLength;
 
       const now = performance.now();
-
-      if(now - lastUi > 250){
-        lastUi = now;
+      if(now - lastUI > 250){
+        lastUI = now;
 
         if(total){
-          const pct = Math.min(100, (received / total) * 100);
-          setStatus(`Baixando cenário: ${pct.toFixed(0)}%`);
+          const pct = Math.min(100,(received / total) * 100);
+          setStatus("Baixando cenário: " + pct.toFixed(0) + "%");
         }else{
           setStatus("Baixando cenário: " + humanMB(received));
         }
@@ -294,7 +325,7 @@ async function fetchModelAsBlob(){
     const blob = new Blob(chunks,{type:"model/gltf-binary"});
 
     if(blob.size < 1000){
-      throw new Error("GLB recebido é pequeno demais");
+      throw new Error("Arquivo GLB inválido ou vazio");
     }
 
     if(blobUrl){
@@ -303,23 +334,22 @@ async function fetchModelAsBlob(){
 
     blobUrl = URL.createObjectURL(blob);
 
-    log("GLB virou Blob URL.");
-    setStatus("Arquivo baixado. Montando o 3D...");
+    setStatus("Montando cenário 3D...");
 
-    arModel.setAttribute("gltf-model", blobUrl);
-    exploreModel.setAttribute("gltf-model", blobUrl);
+    arModel.setAttribute("gltf-model",blobUrl);
+    exploreModel.setAttribute("gltf-model",blobUrl);
 
   }catch(err){
     clearTimeout(timeout);
 
     modelLoading = false;
 
-    log("GLB ERRO: " + err.name + " - " + err.message);
+    log("ERRO GLB: " + err.name + " - " + err.message);
 
     if(err.name === "AbortError"){
       setStatus("Tempo esgotado ao baixar o cenário.");
     }else{
-      setStatus("Erro ao baixar/carregar o cenário.");
+      setStatus("Erro ao abrir o cenário 3D.");
     }
 
     retryBtn.style.display = "block";
@@ -328,11 +358,7 @@ async function fetchModelAsBlob(){
 
 function fitModel(el,holder,desiredSize,label){
   const mesh = el.getObject3D("mesh");
-
-  if(!mesh){
-    log(label + ": mesh indisponível.");
-    return false;
-  }
+  if(!mesh) return false;
 
   mesh.updateMatrixWorld(true);
 
@@ -353,10 +379,11 @@ function fitModel(el,holder,desiredSize,label){
   );
 
   if(!isFinite(maxDim) || maxDim <= 0){
-    log(label + ": dimensões inválidas.");
+    log(label + ": dimensões inválidas");
     return false;
   }
 
+  // Centraliza o próprio modelo no holder
   el.object3D.position.set(
     -center.x,
     -center.y,
@@ -378,86 +405,80 @@ function fitModel(el,holder,desiredSize,label){
     exploreBaseScale = s;
   }
 
-  log(label + " escala automática: " + s.toFixed(7));
   return true;
 }
 
-function checkReady(){
+function checkModelsReady(){
   const arOK = !!arModel.getObject3D("mesh");
-  const exOK = !!exploreModel.getObject3D("mesh");
+  const exploreOK = !!exploreModel.getObject3D("mesh");
 
-  if(arOK && exOK){
-    fitModel(arModel,arHolder,0.85,"AR");
-    fitModel(exploreModel,exploreHolder,2.0,"EXPLORE");
+  if(!arOK || !exploreOK) return;
 
-    modelReady = true;
-    modelLoading = false;
+  fitModel(arModel,arHolder,0.85,"AR");
+  fitModel(exploreModel,exploreHolder,2.0,"EXPLORE");
 
-    log("GLB pronto nos dois modos.");
+  modelReady = true;
+  modelLoading = false;
 
-    if(targetSeen){
-      setStatus("Bosque encontrado!");
-      exploreBtn.style.display = "block";
-    }else{
-      setStatus("Cenário pronto. Aponte para a imagem.");
-    }
+  log("GLB pronto");
+
+  if(targetSeen){
+    setStatus("Bosque encontrado!");
+    exploreBtn.style.display = "block";
+  }else{
+    setStatus("Cenário pronto. Aponte para a imagem.");
   }
 }
 
 arModel.addEventListener("model-loaded",()=>{
-  log("AR: model-loaded");
-  setTimeout(checkReady,100);
+  log("AR model-loaded");
+  setTimeout(checkModelsReady,100);
 });
 
 exploreModel.addEventListener("model-loaded",()=>{
-  log("EXPLORE: model-loaded");
-  setTimeout(checkReady,100);
+  log("EXPLORE model-loaded");
+  setTimeout(checkModelsReady,100);
 });
 
-arModel.addEventListener("model-error",event=>{
+arModel.addEventListener("model-error",()=>{
   modelLoading = false;
-  log("AR: model-error depois do Blob.");
-  console.error(event);
   setStatus("O GLB baixou, mas o 3D não abriu.");
   retryBtn.style.display = "block";
+  log("AR model-error");
 });
 
-exploreModel.addEventListener("model-error",event=>{
-  modelLoading = false;
-  log("EXPLORE: model-error depois do Blob.");
-  console.error(event);
+exploreModel.addEventListener("model-error",()=>{
+  log("EXPLORE model-error");
 });
 
 scene.addEventListener("arReady",()=>{
-  arReady = true;
-  log("AR pronto. Câmera iniciada.");
+  log("AR pronto");
   setStatus("Câmera pronta. Preparando cenário...");
-
-  setTimeout(fetchModelAsBlob,700);
+  setTimeout(loadModel,700);
 });
 
 scene.addEventListener("arError",()=>{
-  log("Erro ao iniciar AR/câmera.");
+  log("Erro ao iniciar AR");
   setStatus("Erro ao iniciar câmera/AR.");
 });
 
 target.addEventListener("targetFound",()=>{
   targetSeen = true;
-  log("Alvo encontrado.");
+  log("Alvo encontrado");
 
   if(!exploreMode){
     if(modelReady){
       setStatus("Bosque encontrado!");
       exploreBtn.style.display = "block";
     }else{
-      setStatus("Imagem encontrada. Cenário ainda carregando...");
+      setStatus("Imagem encontrada. Cenário carregando...");
     }
   }
 });
 
 target.addEventListener("targetLost",()=>{
   targetSeen = false;
-  log("Alvo perdido.");
+  log("Alvo perdido");
 
   if(!exploreMode){
     exploreBtn.style.display = "none";
@@ -470,7 +491,7 @@ target.addEventListener("targetLost",()=>{
 
 retryBtn.addEventListener("click",()=>{
   retryBtn.style.display = "none";
-  fetchModelAsBlob();
+  loadModel();
 });
 
 exploreBtn.addEventListener("click",()=>{
@@ -478,18 +499,21 @@ exploreBtn.addEventListener("click",()=>{
 
   exploreMode = true;
 
+  // Esconde o AR e mostra o modelo livre
   target.setAttribute("visible",false);
   exploreRoot.setAttribute("visible",true);
 
+  touchLayer.style.display = "block";
   exploreBtn.style.display = "none";
   backBtn.style.display = "block";
 
-  setStatus("Arraste para girar • pinça para zoom");
+  setStatus("1 dedo gira • 2 dedos dão zoom");
 });
 
 backBtn.addEventListener("click",()=>{
   exploreMode = false;
 
+  touchLayer.style.display = "none";
   exploreRoot.setAttribute("visible",false);
   target.setAttribute("visible",true);
 
@@ -499,6 +523,7 @@ backBtn.addEventListener("click",()=>{
     exploreBtn.style.display = "block";
     setStatus("Bosque encontrado!");
   }else{
+    exploreBtn.style.display = "none";
     setStatus("Aponte para a imagem.");
   }
 });
@@ -511,76 +536,148 @@ function applyExploreTransform(){
   );
 
   const s = exploreBaseScale * zoomMultiplier;
-
   exploreHolder.object3D.scale.set(s,s,s);
 }
 
-window.addEventListener("pointerdown",event=>{
+/* ============================
+   CONTROLE TOUCH - SOMENTE AQUI
+   ============================ */
+
+touchLayer.addEventListener("touchstart",event=>{
   if(!exploreMode) return;
-  if(event.target === backBtn || event.target === exploreBtn) return;
 
-  dragging = true;
-  lastX = event.clientX;
-  lastY = event.clientY;
-});
+  event.preventDefault();
 
-window.addEventListener("pointermove",event=>{
-  if(!exploreMode || !dragging) return;
-
-  const dx = event.clientX - lastX;
-  const dy = event.clientY - lastY;
-
-  rotY += dx * 0.45;
-  rotX += dy * 0.25;
-
-  rotX = Math.max(-60,Math.min(60,rotX));
-
-  lastX = event.clientX;
-  lastY = event.clientY;
-
-  applyExploreTransform();
-});
-
-window.addEventListener("pointerup",()=>dragging=false);
-window.addEventListener("pointercancel",()=>dragging=false);
-
-window.addEventListener("touchstart",event=>{
-  if(!exploreMode) return;
+  if(event.touches.length === 1){
+    lastTouchX = event.touches[0].clientX;
+    lastTouchY = event.touches[0].clientY;
+  }
 
   if(event.touches.length === 2){
     const a = event.touches[0];
     const b = event.touches[1];
 
-    lastPinch = Math.hypot(
-      b.clientX-a.clientX,
-      b.clientY-a.clientY
+    pinchStartDistance = Math.hypot(
+      b.clientX - a.clientX,
+      b.clientY - a.clientY
     );
+
+    pinchStartZoom = zoomMultiplier;
   }
 },{passive:false});
 
-window.addEventListener("touchmove",event=>{
-  if(!exploreMode || event.touches.length !== 2) return;
+touchLayer.addEventListener("touchmove",event=>{
+  if(!exploreMode) return;
 
   event.preventDefault();
 
-  const a = event.touches[0];
-  const b = event.touches[1];
+  // Um dedo = girar
+  if(event.touches.length === 1){
+    const t = event.touches[0];
 
-  const d = Math.hypot(
-    b.clientX-a.clientX,
-    b.clientY-a.clientY
-  );
+    const dx = t.clientX - lastTouchX;
+    const dy = t.clientY - lastTouchY;
 
-  if(lastPinch){
-    zoomMultiplier *= d / lastPinch;
-    zoomMultiplier = Math.max(0.25,Math.min(4,zoomMultiplier));
+    rotY += dx * 0.45;
+    rotX += dy * 0.25;
+
+    rotX = Math.max(-60,Math.min(60,rotX));
+
+    lastTouchX = t.clientX;
+    lastTouchY = t.clientY;
+
     applyExploreTransform();
   }
 
-  lastPinch = d;
+  // Dois dedos = zoom
+  if(event.touches.length === 2){
+    const a = event.touches[0];
+    const b = event.touches[1];
+
+    const currentDistance = Math.hypot(
+      b.clientX - a.clientX,
+      b.clientY - a.clientY
+    );
+
+    if(pinchStartDistance > 0){
+      zoomMultiplier =
+        pinchStartZoom * (currentDistance / pinchStartDistance);
+
+      zoomMultiplier = Math.max(
+        0.25,
+        Math.min(5,zoomMultiplier)
+      );
+
+      applyExploreTransform();
+    }
+  }
 },{passive:false});
 
-window.addEventListener("touchend",()=>lastPinch=null);
+touchLayer.addEventListener("touchend",event=>{
+  if(event.touches.length === 1){
+    lastTouchX = event.touches[0].clientX;
+    lastTouchY = event.touches[0].clientY;
+  }
+
+  if(event.touches.length < 2){
+    pinchStartDistance = 0;
+    pinchStartZoom = zoomMultiplier;
+  }
+},{passive:false});
+
+touchLayer.addEventListener("touchcancel",()=>{
+  pinchStartDistance = 0;
+  pinchStartZoom = zoomMultiplier;
+},{passive:false});
+
+/* ============================
+   MOUSE - TESTE NO COMPUTADOR
+   ============================ */
+
+touchLayer.addEventListener("mousedown",event=>{
+  if(!exploreMode) return;
+
+  mouseDragging = true;
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+});
+
+window.addEventListener("mousemove",event=>{
+  if(!exploreMode || !mouseDragging) return;
+
+  const dx = event.clientX - lastMouseX;
+  const dy = event.clientY - lastMouseY;
+
+  rotY += dx * 0.45;
+  rotX += dy * 0.25;
+  rotX = Math.max(-60,Math.min(60,rotX));
+
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+
+  applyExploreTransform();
+});
+
+window.addEventListener("mouseup",()=>{
+  mouseDragging = false;
+});
+
+touchLayer.addEventListener("wheel",event=>{
+  if(!exploreMode) return;
+
+  event.preventDefault();
+
+  const factor = event.deltaY < 0 ? 1.08 : 0.92;
+
+  zoomMultiplier *= factor;
+  zoomMultiplier = Math.max(
+    0.25,
+    Math.min(5,zoomMultiplier)
+  );
+
+  applyExploreTransform();
+},{passive:false});
+
 </script>
 </body>
 </html>
