@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Bosque da Bruxa AR</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    }
+
+    video{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      object-fit:cover !important;
+      z-index:0 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+      display:block !important;
+      background:#000;
+    }
+
+    a-scene,.a-canvas{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      z-index:2 !important;
+      background:transparent !important;
+    }
+
+    .mindar-ui-overlay{
+      z-index:5 !important;
+    }
+
+    #status{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      z-index:50;
+      color:#fff;
+      background:rgba(0,0,0,.68);
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:13px;
+      white-space:nowrap;
+      backdrop-filter:blur(8px);
+      pointer-events:none;
+      max-width:88vw;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    #exploreBtn,#backBtn,#retryBtn{
+      position:fixed;
+      top:16px;
+      z-index:60;
+      border:0;
+      border-radius:999px;
+      padding:11px 15px;
+      font-weight:700;
+      font-size:14px;
+      display:none;
+      touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    #exploreBtn,#retryBtn{
+      right:14px;
+      background:#fff;
+      color:#111;
+    }
+
+    #retryBtn{
+      background:#ffdf6c;
+    }
+
+    #backBtn{
+      left:14px;
+      background:rgba(0,0,0,.78);
+      color:#fff;
+    }
+
+    #zoomControls{
+      position:fixed;
+      right:16px;
+      bottom:72px;
+      z-index:65;
+      display:none;
+      gap:10px;
+      flex-direction:column;
+    }
+
+    #zoomControls button{
+      width:52px;
+      height:52px;
+      border:0;
+      border-radius:50%;
+      background:rgba(255,255,255,.92);
+      color:#111;
+      font-size:30px;
+      font-weight:700;
+      line-height:1;
+      box-shadow:0 3px 12px rgba(0,0,0,.28);
+      touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    /*
+      Esta camada só existe no modo Explorar.
+      Assim o giro/zoom não interfere com o AR nem com os botões.
+    */
+    #touchLayer{
+      position:fixed;
+      inset:0;
+      z-index:30;
+      display:none;
+      touch-action:none;
+      background:transparent;
+    }
+
+    /*
+      Diagnóstico fica escondido por padrão.
+      Para mostrar, abra a página com ?debug=1 no final do endereço.
+    */
+    #debug{
+      display:none;
+      position:fixed;
+      left:8px;
+      right:8px;
+      top:70px;
+      z-index:80;
+      color:#fff;
+      background:rgba(0,0,0,.78);
+      padding:9px 11px;
+      border-radius:10px;
+      font-size:11px;
+      line-height:1.4;
+      white-space:pre-wrap;
+      pointer-events:none;
+      max-height:35vh;
+      overflow:auto;
+      backdrop-filter:blur(8px);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="debug">Página carregada.</div>
+
+  <button id="retryBtn">Tentar novamente</button>
+  <button id="exploreBtn">Explorar em 3D</button>
+  <button id="backBtn">← Voltar ao AR</button>
+
+  <div id="zoomControls">
+    <button id="zoomOutBtn" aria-label="Diminuir zoom">−</button>
+    <button id="zoomInBtn" aria-label="Aumentar zoom">+</button>
+  </div>
+
+  <div id="touchLayer"></div>
+  <div id="status">Iniciando câmera...</div>
+
+  <a-scene
+    id="scene"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
+    embedded
+    vr-mode-ui="enabled:false"
+    device-orientation-permission-ui="enabled:false"
+    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
+
+    <a-entity light="type:ambient; intensity:1.55; color:#ffffff"></a-entity>
+    <a-entity light="type:directional; intensity:1.35; color:#ffe8c2" position="-2 4 3"></a-entity>
+
+    <!-- Os alvos AR são criados automaticamente pelo bloco CENAS abaixo. -->
+
+    <!-- Explorar 3D: modelo separado do alvo -->
+    <a-entity id="exploreRoot" visible="false" position="0 0 -3">
+      <a-entity id="exploreHolder">
+        <a-entity id="exploreModel"></a-entity>
+      </a-entity>
+    </a-entity>
+
+    <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
+  </a-scene>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO DAS CENAS — É PRINCIPALMENTE AQUI QUE VOCÊ MEXE
+   ============================================================
+
+   IMPORTANTE:
+   - O arquivo targets.mind deve conter TODAS as imagens de rastreio.
+   - targetIndex: 0 = primeira imagem do compilador MindAR
+                  1 = segunda imagem
+                  2 = terceira imagem...
+   - Para adicionar outra caneca, COPIE um bloco inteiro e troque os dados.
+*/
+const CENAS = [
+  {
+    // ==================== CENA 1 ====================
+    nome: "Bosque da Bruxa",
+    targetIndex: 0,
+    modelPath: "./Casa_da_bruxa_web.glb",
+
+    // Tamanho do cenário quando aparece PRESO NA CANECA (AR)
+    arTamanho: 0.85,
+
+    // Posição do cenário na caneca: X = lados, Y = altura, Z = profundidade
+    arPosicao: { x: 0, y: 0.03, z: 0 },
+
+    // Rotação inicial em graus: X = inclinação, Y = giro, Z = tombar
+    arRotacao: { x: -8, y: 0, z: 0 },
+
+    // Tamanho e posição quando clicar em "Explorar em 3D"
+    explorarTamanho: 2.0,
+    explorarPosicao: { x: 0, y: -0.12, z: 0 },
+    explorarRotacao: { x: 0, y: 0, z: 0 }
+  },
+
+  /*
+  // ==================== CENA 2 ====================
+  // Quando tiver a segunda cena, tire o comentário deste bloco.
+  {
+    nome: "Castelo",
+    targetIndex: 1,
+    modelPath: "./castelo.glb",
+    arTamanho: 0.85,
+    arPosicao: { x: 0, y: 0.03, z: 0 },
+    arRotacao: { x: -8, y: 0, z: 0 },
+    explorarTamanho: 2.0,
+    explorarPosicao: { x: 0, y: -0.12, z: 0 },
+    explorarRotacao: { x: 0, y: 0, z: 0 }
+  },
+  */
+];
+
+/* ============================================================
+   DAQUI PARA BAIXO, NORMALMENTE NÃO PRECISA MEXER
+   ============================================================ */
+
+const scene = document.getElementById("scene");
+const exploreRoot = document.getElementById("exploreRoot");
+const exploreModel = document.getElementById("exploreModel");
+const exploreHolder = document.getElementById("exploreHolder");
+const statusEl = document.getElementById("status");
+const debugEl = document.getElementById("debug");
+const exploreBtn = document.getElementById("exploreBtn");
+const backBtn = document.getElementById("backBtn");
+const retryBtn = document.getElementById("retryBtn");
+const zoomControls = document.getElementById("zoomControls");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const touchLayer = document.getElementById("touchLayer");
+
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+if(DEBUG) debugEl.style.display = "block";
+
+let exploreMode = false;
+let activeScene = null;
+let activeTarget = null;
+let activeArHolder = null;
+let activeArModel = null;
+let targetSeen = false;
+let loadToken = 0;
+let currentBlobUrl = null;
+let modelLoading = false;
+let modelReady = false;
+
+let exploreBaseScale = 1;
+let zoomMultiplier = 1;
+let rotX = 0;
+let rotY = 0;
+
+let lastTouchX = 0;
+let lastTouchY = 0;
+let mouseDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+
+function log(msg){
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent += "\n" + msg;
+    debugEl.scrollTop = debugEl.scrollHeight;
+  }
+}
+
+function setStatus(msg){
+  statusEl.textContent = msg;
+}
+
+function humanMB(bytes){
+  return (bytes / 1024 / 1024).toFixed(2) + " MB";
+}
+
+function forceVideoVisible(){
+  document.querySelectorAll("video").forEach(video=>{
+    video.setAttribute("playsinline","");
+    video.setAttribute("autoplay","");
+    video.muted = true;
+    Object.assign(video.style,{
+      position:"fixed", inset:"0", width:"100vw", height:"100vh",
+      objectFit:"cover", zIndex:"0", opacity:"1", visibility:"visible", display:"block"
+    });
+    if(video.paused) video.play().catch(()=>{});
+  });
+}
+setInterval(forceVideoVisible,600);
+
+// Cria automaticamente um rastreador para cada bloco da lista CENAS.
+function criarTargets(){
+  const camera = scene.querySelector("a-camera");
+
+  CENAS.forEach(cfg=>{
+    const target = document.createElement("a-entity");
+    target.setAttribute("mindar-image-target", `targetIndex:${cfg.targetIndex}`);
+    target.dataset.targetIndex = cfg.targetIndex;
+
+    const holder = document.createElement("a-entity");
+    const model = document.createElement("a-entity");
+    holder.appendChild(model);
+    target.appendChild(holder);
+    scene.insertBefore(target,camera);
+
+    cfg._target = target;
+    cfg._holder = holder;
+    cfg._model = model;
+    cfg._ready = false;
+    cfg._loadedUrl = null;
+
+    target.addEventListener("targetFound",()=>ativarCena(cfg));
+    target.addEventListener("targetLost",()=>perderCena(cfg));
+  });
+}
+
+function resetActiveModel(){
+  modelReady = false;
+  modelLoading = false;
+  retryBtn.style.display = "none";
+
+  CENAS.forEach(cfg=>{
+    cfg._target.object3D.visible = true;
+    cfg._holder.object3D.visible = true;
+  });
+}
+
+async function ativarCena(cfg){
+  targetSeen = true;
+  activeScene = cfg;
+  activeTarget = cfg._target;
+  activeArHolder = cfg._holder;
+  activeArModel = cfg._model;
+
+  log("Alvo encontrado: " + cfg.nome);
+
+  if(exploreMode) return;
+
+  if(cfg._ready){
+    modelReady = true;
+    setStatus(cfg.nome + " encontrado!");
+    exploreBtn.style.display = "block";
+    return;
+  }
+
+  setStatus("Imagem encontrada. Carregando " + cfg.nome + "...");
+  await loadSceneModel(cfg);
+}
+
+function perderCena(cfg){
+  if(activeScene !== cfg) return;
+
+  targetSeen = false;
+  log("Alvo perdido: " + cfg.nome);
+
+  if(!exploreMode){
+    exploreBtn.style.display = "none";
+    setStatus("Aponte novamente para a imagem.");
+  }
+}
+
+async function loadSceneModel(cfg){
+  if(modelLoading) return;
+
+  modelLoading = true;
+  modelReady = false;
+  retryBtn.style.display = "none";
+  const myToken = ++loadToken;
+
+  try{
+    setStatus("Baixando cenário 3D...");
+    const response = await fetch(cfg.modelPath + "?v=" + Date.now(), {cache:"no-store"});
+    if(!response.ok) throw new Error("HTTP " + response.status);
+
+    const total = Number(response.headers.get("content-length")) || 0;
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    let lastUI = 0;
+
+    while(true){
+      const {done,value} = await reader.read();
+      if(done) break;
+      if(myToken !== loadToken) return;
+
+      chunks.push(value);
+      received += value.byteLength;
+
+      const now = performance.now();
+      if(now-lastUI > 250){
+        lastUI = now;
+        if(total){
+          const pct = Math.min(100,(received/total)*100);
+          setStatus("Baixando cenário: " + pct.toFixed(0) + "%");
+        }else{
+          setStatus("Baixando cenário: " + humanMB(received));
+        }
+      }
+    }
+
+    const blob = new Blob(chunks,{type:"model/gltf-binary"});
+    if(blob.size < 1000) throw new Error("Arquivo GLB inválido ou vazio");
+
+    if(currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = URL.createObjectURL(blob);
+    cfg._loadedUrl = currentBlobUrl;
+
+    setStatus("Montando cenário 3D...");
+
+    // Usa o mesmo GLB em duas instâncias: uma presa ao AR e outra no modo Explorar.
+    cfg._model.setAttribute("gltf-model",currentBlobUrl);
+    exploreModel.setAttribute("gltf-model",currentBlobUrl);
+
+    await Promise.all([
+      waitModelLoaded(cfg._model),
+      waitModelLoaded(exploreModel)
+    ]);
+
+    if(myToken !== loadToken) return;
+
+    fitModel(cfg._model,cfg._holder,cfg.arTamanho,"AR",cfg);
+    fitModel(exploreModel,exploreHolder,cfg.explorarTamanho,"EXPLORE",cfg);
+
+    cfg._ready = true;
+    modelReady = true;
+    modelLoading = false;
+    zoomMultiplier = 1;
+    rotX = cfg.explorarRotacao.x;
+    rotY = cfg.explorarRotacao.y;
+    applyExploreTransform();
+
+    if(targetSeen && activeScene === cfg){
+      setStatus(cfg.nome + " encontrado!");
+      exploreBtn.style.display = "block";
+    }
+
+  }catch(err){
+    modelLoading = false;
+    log("ERRO GLB: " + err.name + " - " + err.message);
+    setStatus("Erro ao abrir o cenário 3D.");
+    retryBtn.style.display = "block";
+  }
+}
+
+function waitModelLoaded(el){
+  return new Promise((resolve,reject)=>{
+    if(el.getObject3D("mesh")) return resolve();
+
+    const ok=()=>{ cleanup(); resolve(); };
+    const bad=()=>{ cleanup(); reject(new Error("model-error")); };
+    const cleanup=()=>{
+      el.removeEventListener("model-loaded",ok);
+      el.removeEventListener("model-error",bad);
+    };
+
+    el.addEventListener("model-loaded",ok,{once:true});
+    el.addEventListener("model-error",bad,{once:true});
+  });
+}
+
+function fitModel(el,holder,desiredSize,label,cfg){
+  const mesh = el.getObject3D("mesh");
+  if(!mesh) return false;
+
+  mesh.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x,size.y,size.z);
+  if(!isFinite(maxDim) || maxDim <= 0) return false;
+
+  // Centraliza o GLB automaticamente.
+  el.object3D.position.set(-center.x,-center.y,-center.z);
+
+  const s = desiredSize/maxDim;
+  holder.object3D.scale.set(s,s,s);
+
+  if(label === "AR"){
+    holder.object3D.position.set(cfg.arPosicao.x,cfg.arPosicao.y,cfg.arPosicao.z);
+    holder.object3D.rotation.set(
+      THREE.MathUtils.degToRad(cfg.arRotacao.x),
+      THREE.MathUtils.degToRad(cfg.arRotacao.y),
+      THREE.MathUtils.degToRad(cfg.arRotacao.z)
+    );
+  }else{
+    holder.object3D.position.set(
+      cfg.explorarPosicao.x,
+      cfg.explorarPosicao.y,
+      cfg.explorarPosicao.z
+    );
+    exploreBaseScale = s;
+  }
+  return true;
+}
+
+scene.addEventListener("arReady",()=>{
+  log("AR pronto");
+  setStatus("Câmera pronta. Aponte para a imagem.");
+});
+
+scene.addEventListener("arError",()=>{
+  log("Erro ao iniciar AR");
+  setStatus("Erro ao iniciar câmera/AR.");
+});
+
+retryBtn.addEventListener("click",()=>{
+  if(!activeScene) return;
+  retryBtn.style.display = "none";
+  modelLoading = false;
+  loadSceneModel(activeScene);
+});
+
+exploreBtn.addEventListener("click",()=>{
+  if(!modelReady || !activeScene) return;
+
+  exploreMode = true;
+  CENAS.forEach(cfg=>{
+    cfg._target.object3D.visible = false;
+    cfg._holder.object3D.visible = false;
+  });
+
+  exploreRoot.setAttribute("visible",true);
+  exploreRoot.object3D.visible = true;
+  touchLayer.style.display = "block";
+  zoomControls.style.display = "flex";
+  exploreBtn.style.display = "none";
+  backBtn.style.display = "block";
+  setStatus("Arraste com 1 dedo para girar • use − / + para zoom");
+});
+
+backBtn.addEventListener("click",()=>{
+  exploreMode = false;
+  touchLayer.style.display = "none";
+  zoomControls.style.display = "none";
+  exploreRoot.setAttribute("visible",false);
+  exploreRoot.object3D.visible = false;
+
+  CENAS.forEach(cfg=>{
+    cfg._target.object3D.visible = true;
+    cfg._holder.object3D.visible = true;
+  });
+
+  backBtn.style.display = "none";
+
+  if(targetSeen && modelReady && activeScene){
+    exploreBtn.style.display = "block";
+    setStatus(activeScene.nome + " encontrado!");
+  }else{
+    exploreBtn.style.display = "none";
+    setStatus("Aponte para a imagem.");
+  }
+});
+
+function applyExploreTransform(){
+  if(!activeScene) return;
+
+  exploreHolder.object3D.rotation.set(
+    THREE.MathUtils.degToRad(rotX),
+    THREE.MathUtils.degToRad(rotY),
+    THREE.MathUtils.degToRad(activeScene.explorarRotacao.z)
+  );
+
+  const s = exploreBaseScale*zoomMultiplier;
+  exploreHolder.object3D.scale.set(s,s,s);
+}
+
+function changeZoom(factor){
+  if(!exploreMode) return;
+  zoomMultiplier *= factor;
+  zoomMultiplier = Math.max(0.25,Math.min(5,zoomMultiplier));
+  applyExploreTransform();
+}
+
+zoomInBtn.addEventListener("click",event=>{
+  event.stopPropagation();
+  changeZoom(1.18);
+});
+
+zoomOutBtn.addEventListener("click",event=>{
+  event.stopPropagation();
+  changeZoom(1/1.18);
+});
+
+zoomInBtn.addEventListener("touchstart",event=>event.stopPropagation(),{passive:true});
+zoomOutBtn.addEventListener("touchstart",event=>event.stopPropagation(),{passive:true});
+
+/* ============================
+   GIRO COM O DEDO
+   ============================ */
+touchLayer.addEventListener("touchstart",event=>{
+  if(!exploreMode) return;
+  event.preventDefault();
+
+  if(event.touches.length === 1){
+    lastTouchX = event.touches[0].clientX;
+    lastTouchY = event.touches[0].clientY;
+  }
+},{passive:false});
+
+touchLayer.addEventListener("touchmove",event=>{
+  if(!exploreMode) return;
+  event.preventDefault();
+
+  if(event.touches.length === 1){
+    const t = event.touches[0];
+    const dx = t.clientX-lastTouchX;
+    const dy = t.clientY-lastTouchY;
+
+    // Horizontal: gira livremente em 360 graus.
+    rotY += dx*0.45;
+
+    // Vertical: inclinação limitada para não virar de cabeça para baixo.
+    rotX += dy*0.25;
+    rotX = Math.max(-60,Math.min(60,rotX));
+
+    lastTouchX = t.clientX;
+    lastTouchY = t.clientY;
+    applyExploreTransform();
+  }
+},{passive:false});
+
+// Mouse para testar no computador.
+touchLayer.addEventListener("mousedown",event=>{
+  if(!exploreMode) return;
+  mouseDragging = true;
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+});
+
+window.addEventListener("mousemove",event=>{
+  if(!exploreMode || !mouseDragging) return;
+
+  const dx = event.clientX-lastMouseX;
+  const dy = event.clientY-lastMouseY;
+  rotY += dx*0.45;
+  rotX += dy*0.25;
+  rotX = Math.max(-60,Math.min(60,rotX));
+
+  lastMouseX = event.clientX;
+  lastMouseY = event.clientY;
+  applyExploreTransform();
+});
+
+window.addEventListener("mouseup",()=>{ mouseDragging=false; });
+
+// Inicializa os rastreadores configurados acima.
+criarTargets();
+</script>
+</body>
+</html>
