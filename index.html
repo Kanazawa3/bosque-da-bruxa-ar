@@ -3,52 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Bosque da Bruxa AR</title>
+  <title>Bosque da Bruxa AR - GLB Diagnóstico</title>
 
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;object-fit:cover!important;z-index:0!important;opacity:1!important;visibility:visible!important;display:block!important;background:#000}
-    a-scene,.a-canvas{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:2!important;background:transparent!important}
-    .mindar-ui-overlay{z-index:5!important}
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#000;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      touch-action:none;
+    }
 
-    #status{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;color:#fff;background:rgba(0,0,0,.68);padding:10px 14px;border-radius:999px;font-size:13px;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none;backdrop-filter:blur(8px)}
+    video{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      object-fit:cover !important;
+      z-index:0 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+      display:block !important;
+      background:#000;
+    }
 
-    #exploreBtn,#backBtn,#retryBtn{position:fixed;top:16px;z-index:80;border:0;border-radius:999px;padding:11px 15px;font-size:14px;font-weight:700;display:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer}
-    #exploreBtn,#retryBtn{right:14px;background:#fff;color:#111}
-    #retryBtn{background:#ffdf6c}
-    #backBtn{left:14px;background:rgba(0,0,0,.78);color:#fff}
+    a-scene,.a-canvas{
+      position:fixed !important;
+      inset:0 !important;
+      width:100vw !important;
+      height:100vh !important;
+      z-index:2 !important;
+      background:transparent !important;
+    }
 
-    #touchLayer{position:fixed;inset:0;z-index:30;display:none;touch-action:none;background:transparent}
+    .mindar-ui-overlay{z-index:5 !important}
 
-    #zoomControls{position:fixed;right:16px;bottom:72px;z-index:85;display:none;flex-direction:column;gap:10px}
-    #zoomControls button{width:52px;height:52px;border:0;border-radius:50%;background:rgba(255,255,255,.94);color:#111;font-size:30px;font-weight:700;line-height:1;box-shadow:0 3px 12px rgba(0,0,0,.28);touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer}
+    #debug{
+      position:fixed;
+      left:8px;
+      right:8px;
+      top:8px;
+      z-index:30;
+      color:#fff;
+      background:rgba(0,0,0,.72);
+      padding:9px 11px;
+      border-radius:10px;
+      font-size:11px;
+      line-height:1.4;
+      white-space:pre-wrap;
+      pointer-events:none;
+      max-height:32vh;
+      overflow:auto;
+      backdrop-filter:blur(8px);
+    }
 
-    #debug{display:none;position:fixed;left:8px;right:8px;top:70px;z-index:100;color:#fff;background:rgba(0,0,0,.80);padding:9px 11px;border-radius:10px;font-size:11px;line-height:1.4;white-space:pre-wrap;pointer-events:none;max-height:38vh;overflow:auto;backdrop-filter:blur(8px)}
+    #status{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      z-index:30;
+      color:#fff;
+      background:rgba(0,0,0,.68);
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:13px;
+      white-space:nowrap;
+      backdrop-filter:blur(8px);
+      pointer-events:none;
+    }
+
+    #retryBtn,#exploreBtn,#backBtn{
+      position:fixed;
+      top:16px;
+      z-index:40;
+      border:0;
+      border-radius:999px;
+      padding:11px 15px;
+      font-weight:700;
+      font-size:14px;
+      pointer-events:auto;
+      display:none;
+    }
+
+    #retryBtn{
+      right:14px;
+      background:#ffdf6c;
+      color:#111;
+    }
+
+    #exploreBtn{
+      right:14px;
+      background:#fff;
+      color:#111;
+    }
+
+    #backBtn{
+      left:14px;
+      background:rgba(0,0,0,.75);
+      color:#fff;
+    }
   </style>
 </head>
 
 <body>
+
   <div id="debug">Página carregada.</div>
-  <button id="retryBtn">Tentar novamente</button>
+  <button id="retryBtn">Tentar GLB novamente</button>
   <button id="exploreBtn">Explorar em 3D</button>
   <button id="backBtn">← Voltar ao AR</button>
-
-  <div id="zoomControls">
-    <button id="zoomInBtn" aria-label="Aumentar">+</button>
-    <button id="zoomOutBtn" aria-label="Diminuir">−</button>
-  </div>
-
-  <div id="touchLayer"></div>
   <div id="status">Iniciando câmera...</div>
 
   <a-scene
     id="scene"
-    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes; filterMinCF: 0.0005; filterBeta: 1000; warmupTolerance: 3; missTolerance: 12;"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;"
     embedded
-    color-space="sRGB"
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false"
     renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
@@ -76,127 +150,250 @@ const MODEL_PATH = "./Casa_da_bruxa_web.glb";
 
 const scene = document.getElementById("scene");
 const target = document.getElementById("target");
+
 const arModel = document.getElementById("arModel");
 const arHolder = document.getElementById("arHolder");
+
 const exploreRoot = document.getElementById("exploreRoot");
 const exploreModel = document.getElementById("exploreModel");
 const exploreHolder = document.getElementById("exploreHolder");
-const statusEl = document.getElementById("status");
+
 const debugEl = document.getElementById("debug");
+const statusEl = document.getElementById("status");
+
+const retryBtn = document.getElementById("retryBtn");
 const exploreBtn = document.getElementById("exploreBtn");
 const backBtn = document.getElementById("backBtn");
-const retryBtn = document.getElementById("retryBtn");
-const touchLayer = document.getElementById("touchLayer");
-const zoomControls = document.getElementById("zoomControls");
-const zoomInBtn = document.getElementById("zoomInBtn");
-const zoomOutBtn = document.getElementById("zoomOutBtn");
 
-const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
-if(DEBUG) debugEl.style.display = "block";
-
+let arReady = false;
 let modelReady = false;
 let modelLoading = false;
 let targetSeen = false;
 let exploreMode = false;
-let exploreBaseScale = 1;
-let zoomMultiplier = 1;
+
+let blobUrl = null;
+let controller = null;
+
 let rotX = 0;
 let rotY = 0;
-let lastTouchX = 0;
-let lastTouchY = 0;
-let mouseDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
+let zoomMultiplier = 1;
+let exploreBaseScale = 1;
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+let lastPinch = null;
 
 function log(msg){
-  console.log(msg);
-  if(DEBUG){
-    debugEl.textContent += "\n" + msg;
-    debugEl.scrollTop = debugEl.scrollHeight;
-  }
+  debugEl.textContent += "\n" + msg;
+  debugEl.scrollTop = debugEl.scrollHeight;
 }
 
-function setStatus(msg){ statusEl.textContent = msg; }
+function setStatus(msg){
+  statusEl.textContent = msg;
+}
 
 function forceVideoVisible(){
-  document.querySelectorAll("video").forEach(video=>{
+  document.querySelectorAll("video").forEach(video => {
     video.setAttribute("playsinline","");
     video.setAttribute("autoplay","");
     video.muted = true;
-    Object.assign(video.style,{position:"fixed",inset:"0",width:"100vw",height:"100vh",objectFit:"cover",zIndex:"0",opacity:"1",visibility:"visible",display:"block"});
-    if(video.paused) video.play().catch(()=>{});
+
+    Object.assign(video.style,{
+      position:"fixed",
+      inset:"0",
+      width:"100vw",
+      height:"100vh",
+      objectFit:"cover",
+      zIndex:"0",
+      opacity:"1",
+      visibility:"visible",
+      display:"block"
+    });
+
+    if(video.paused){
+      video.play().catch(()=>{});
+    }
   });
 }
-setInterval(forceVideoVisible,700);
+setInterval(forceVideoVisible,600);
+
+function humanMB(bytes){
+  return (bytes / 1024 / 1024).toFixed(2) + " MB";
+}
+
+async function fetchModelAsBlob(){
+  if(modelLoading || modelReady) return;
+
+  modelLoading = true;
+  retryBtn.style.display = "none";
+
+  if(controller){
+    try{ controller.abort(); }catch(e){}
+  }
+
+  controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+
+  const url = MODEL_PATH + "?v=" + Date.now();
+
+  try{
+    log("GLB: iniciando fetch");
+    log("GLB URL: " + url);
+    setStatus("Baixando cenário 3D...");
+
+    const response = await fetch(url,{
+      cache:"no-store",
+      signal:controller.signal
+    });
+
+    log("GLB HTTP: " + response.status + " " + response.statusText);
+    log("Content-Type: " + (response.headers.get("content-type") || "(sem content-type)"));
+
+    if(!response.ok){
+      throw new Error("HTTP " + response.status);
+    }
+
+    const total = Number(response.headers.get("content-length")) || 0;
+
+    if(total){
+      log("GLB tamanho informado: " + humanMB(total));
+    }else{
+      log("GLB sem Content-Length informado.");
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    let lastUi = 0;
+
+    while(true){
+      const {done,value} = await reader.read();
+      if(done) break;
+
+      chunks.push(value);
+      received += value.byteLength;
+
+      const now = performance.now();
+
+      if(now - lastUi > 250){
+        lastUi = now;
+
+        if(total){
+          const pct = Math.min(100, (received / total) * 100);
+          setStatus(`Baixando cenário: ${pct.toFixed(0)}%`);
+        }else{
+          setStatus("Baixando cenário: " + humanMB(received));
+        }
+      }
+    }
+
+    clearTimeout(timeout);
+
+    log("GLB recebido: " + humanMB(received));
+
+    const blob = new Blob(chunks,{type:"model/gltf-binary"});
+
+    if(blob.size < 1000){
+      throw new Error("GLB recebido é pequeno demais");
+    }
+
+    if(blobUrl){
+      URL.revokeObjectURL(blobUrl);
+    }
+
+    blobUrl = URL.createObjectURL(blob);
+
+    log("GLB virou Blob URL.");
+    setStatus("Arquivo baixado. Montando o 3D...");
+
+    arModel.setAttribute("gltf-model", blobUrl);
+    exploreModel.setAttribute("gltf-model", blobUrl);
+
+  }catch(err){
+    clearTimeout(timeout);
+
+    modelLoading = false;
+
+    log("GLB ERRO: " + err.name + " - " + err.message);
+
+    if(err.name === "AbortError"){
+      setStatus("Tempo esgotado ao baixar o cenário.");
+    }else{
+      setStatus("Erro ao baixar/carregar o cenário.");
+    }
+
+    retryBtn.style.display = "block";
+  }
+}
 
 function fitModel(el,holder,desiredSize,label){
   const mesh = el.getObject3D("mesh");
-  if(!mesh) return false;
+
+  if(!mesh){
+    log(label + ": mesh indisponível.");
+    return false;
+  }
 
   mesh.updateMatrixWorld(true);
+
   const box = new THREE.Box3().setFromObject(mesh);
   const size = new THREE.Vector3();
   const center = new THREE.Vector3();
+
   box.getSize(size);
   box.getCenter(center);
 
   const maxDim = Math.max(size.x,size.y,size.z);
-  if(!isFinite(maxDim) || maxDim <= 0) return false;
 
-  el.object3D.position.set(-center.x,-center.y,-center.z);
+  log(
+    label + " tamanho: " +
+    size.x.toFixed(3) + " x " +
+    size.y.toFixed(3) + " x " +
+    size.z.toFixed(3)
+  );
+
+  if(!isFinite(maxDim) || maxDim <= 0){
+    log(label + ": dimensões inválidas.");
+    return false;
+  }
+
+  el.object3D.position.set(
+    -center.x,
+    -center.y,
+    -center.z
+  );
 
   const s = desiredSize / maxDim;
   holder.object3D.scale.set(s,s,s);
 
   if(label === "AR"){
     holder.object3D.position.set(0,0.03,0);
-    holder.object3D.rotation.set(THREE.MathUtils.degToRad(-8),0,0);
+    holder.object3D.rotation.set(
+      THREE.MathUtils.degToRad(-8),
+      0,
+      0
+    );
   }else{
     holder.object3D.position.set(0,-0.12,0);
     exploreBaseScale = s;
   }
 
-  log(label + " pronto. Escala: " + s.toFixed(7));
+  log(label + " escala automática: " + s.toFixed(7));
   return true;
 }
 
-function buildExploreClone(){
-  const sourceMesh = arModel.getObject3D("mesh");
-  if(!sourceMesh) throw new Error("Mesh AR indisponível");
+function checkReady(){
+  const arOK = !!arModel.getObject3D("mesh");
+  const exOK = !!exploreModel.getObject3D("mesh");
 
-  const clone = sourceMesh.clone(true);
-  exploreModel.removeObject3D("mesh");
-  exploreModel.setObject3D("mesh",clone);
-  clone.updateMatrixWorld(true);
-
-  return fitModel(exploreModel,exploreHolder,2.0,"EXPLORE");
-}
-
-function loadModel(){
-  if(modelLoading || modelReady) return;
-
-  modelLoading = true;
-  retryBtn.style.display = "none";
-  setStatus("Carregando cenário 3D...");
-  log("GLB: iniciando carregamento.");
-
-  const url = MODEL_PATH + "?v=" + Date.now();
-  arModel.removeAttribute("gltf-model");
-
-  setTimeout(()=>{
-    arModel.setAttribute("gltf-model",url);
-  },50);
-}
-
-arModel.addEventListener("model-loaded",()=>{
-  try{
-    log("AR: model-loaded.");
-
-    if(!fitModel(arModel,arHolder,0.85,"AR")) throw new Error("Falha ao ajustar AR");
-    if(!buildExploreClone()) throw new Error("Falha ao criar Explorar");
+  if(arOK && exOK){
+    fitModel(arModel,arHolder,0.85,"AR");
+    fitModel(exploreModel,exploreHolder,2.0,"EXPLORE");
 
     modelReady = true;
     modelLoading = false;
+
+    log("GLB pronto nos dois modos.");
 
     if(targetSeen){
       setStatus("Bosque encontrado!");
@@ -204,32 +401,43 @@ arModel.addEventListener("model-loaded",()=>{
     }else{
       setStatus("Cenário pronto. Aponte para a imagem.");
     }
-  }catch(err){
-    modelReady = false;
-    modelLoading = false;
-    log("ERRO ao preparar GLB: " + err.message);
-    setStatus("Erro ao preparar o cenário 3D.");
-    retryBtn.style.display = "block";
   }
+}
+
+arModel.addEventListener("model-loaded",()=>{
+  log("AR: model-loaded");
+  setTimeout(checkReady,100);
+});
+
+exploreModel.addEventListener("model-loaded",()=>{
+  log("EXPLORE: model-loaded");
+  setTimeout(checkReady,100);
 });
 
 arModel.addEventListener("model-error",event=>{
-  modelReady = false;
   modelLoading = false;
-  log("AR: model-error.");
+  log("AR: model-error depois do Blob.");
   console.error(event);
-  setStatus("Erro ao abrir o cenário 3D.");
+  setStatus("O GLB baixou, mas o 3D não abriu.");
   retryBtn.style.display = "block";
 });
 
+exploreModel.addEventListener("model-error",event=>{
+  modelLoading = false;
+  log("EXPLORE: model-error depois do Blob.");
+  console.error(event);
+});
+
 scene.addEventListener("arReady",()=>{
-  log("AR pronto.");
+  arReady = true;
+  log("AR pronto. Câmera iniciada.");
   setStatus("Câmera pronta. Preparando cenário...");
-  setTimeout(loadModel,500);
+
+  setTimeout(fetchModelAsBlob,700);
 });
 
 scene.addEventListener("arError",()=>{
-  log("Erro ao iniciar câmera/AR.");
+  log("Erro ao iniciar AR/câmera.");
   setStatus("Erro ao iniciar câmera/AR.");
 });
 
@@ -242,7 +450,7 @@ target.addEventListener("targetFound",()=>{
       setStatus("Bosque encontrado!");
       exploreBtn.style.display = "block";
     }else{
-      setStatus("Imagem encontrada. Cenário carregando...");
+      setStatus("Imagem encontrada. Cenário ainda carregando...");
     }
   }
 });
@@ -253,59 +461,36 @@ target.addEventListener("targetLost",()=>{
 
   if(!exploreMode){
     exploreBtn.style.display = "none";
-    if(modelReady) setStatus("Aponte novamente para a imagem.");
+
+    if(modelReady){
+      setStatus("Aponte novamente para a imagem.");
+    }
   }
 });
 
 retryBtn.addEventListener("click",()=>{
-  modelReady = false;
-  modelLoading = false;
   retryBtn.style.display = "none";
-  loadModel();
+  fetchModelAsBlob();
 });
-
-function applyExploreTransform(){
-  exploreHolder.object3D.rotation.set(THREE.MathUtils.degToRad(rotX),THREE.MathUtils.degToRad(rotY),0);
-  const s = exploreBaseScale * zoomMultiplier;
-  exploreHolder.object3D.scale.set(s,s,s);
-}
 
 exploreBtn.addEventListener("click",()=>{
   if(!modelReady) return;
 
   exploreMode = true;
 
-  arHolder.object3D.visible = false;
-  target.object3D.visible = false;
   target.setAttribute("visible",false);
-
   exploreRoot.setAttribute("visible",true);
-  exploreRoot.object3D.visible = true;
 
-  rotX = 0;
-  rotY = 0;
-  zoomMultiplier = 1;
-  applyExploreTransform();
-
-  touchLayer.style.display = "block";
-  zoomControls.style.display = "flex";
   exploreBtn.style.display = "none";
   backBtn.style.display = "block";
 
-  setStatus("1 dedo gira • use − / + para zoom");
+  setStatus("Arraste para girar • pinça para zoom");
 });
 
 backBtn.addEventListener("click",()=>{
   exploreMode = false;
 
-  touchLayer.style.display = "none";
-  zoomControls.style.display = "none";
-
   exploreRoot.setAttribute("visible",false);
-  exploreRoot.object3D.visible = false;
-
-  arHolder.object3D.visible = true;
-  target.object3D.visible = true;
   target.setAttribute("visible",true);
 
   backBtn.style.display = "none";
@@ -314,93 +499,88 @@ backBtn.addEventListener("click",()=>{
     exploreBtn.style.display = "block";
     setStatus("Bosque encontrado!");
   }else{
-    exploreBtn.style.display = "none";
     setStatus("Aponte para a imagem.");
   }
 });
 
-function changeZoom(factor){
-  if(!exploreMode) return;
-  zoomMultiplier *= factor;
-  zoomMultiplier = Math.max(0.30,Math.min(5.0,zoomMultiplier));
-  applyExploreTransform();
+function applyExploreTransform(){
+  exploreHolder.object3D.rotation.set(
+    THREE.MathUtils.degToRad(rotX),
+    THREE.MathUtils.degToRad(rotY),
+    0
+  );
+
+  const s = exploreBaseScale * zoomMultiplier;
+
+  exploreHolder.object3D.scale.set(s,s,s);
 }
 
-zoomInBtn.addEventListener("click",event=>{
-  event.stopPropagation();
-  changeZoom(1.20);
+window.addEventListener("pointerdown",event=>{
+  if(!exploreMode) return;
+  if(event.target === backBtn || event.target === exploreBtn) return;
+
+  dragging = true;
+  lastX = event.clientX;
+  lastY = event.clientY;
 });
 
-zoomOutBtn.addEventListener("click",event=>{
-  event.stopPropagation();
-  changeZoom(1/1.20);
-});
+window.addEventListener("pointermove",event=>{
+  if(!exploreMode || !dragging) return;
 
-touchLayer.addEventListener("touchstart",event=>{
-  if(!exploreMode || event.touches.length !== 1) return;
-  event.preventDefault();
-  lastTouchX = event.touches[0].clientX;
-  lastTouchY = event.touches[0].clientY;
-},{passive:false});
-
-touchLayer.addEventListener("touchmove",event=>{
-  if(!exploreMode || event.touches.length !== 1) return;
-  event.preventDefault();
-
-  const touch = event.touches[0];
-  const dx = touch.clientX - lastTouchX;
-  const dy = touch.clientY - lastTouchY;
+  const dx = event.clientX - lastX;
+  const dy = event.clientY - lastY;
 
   rotY += dx * 0.45;
   rotX += dy * 0.25;
-  rotX = Math.max(-70,Math.min(70,rotX));
 
-  lastTouchX = touch.clientX;
-  lastTouchY = touch.clientY;
+  rotX = Math.max(-60,Math.min(60,rotX));
+
+  lastX = event.clientX;
+  lastY = event.clientY;
+
   applyExploreTransform();
+});
+
+window.addEventListener("pointerup",()=>dragging=false);
+window.addEventListener("pointercancel",()=>dragging=false);
+
+window.addEventListener("touchstart",event=>{
+  if(!exploreMode) return;
+
+  if(event.touches.length === 2){
+    const a = event.touches[0];
+    const b = event.touches[1];
+
+    lastPinch = Math.hypot(
+      b.clientX-a.clientX,
+      b.clientY-a.clientY
+    );
+  }
 },{passive:false});
 
-touchLayer.addEventListener("mousedown",event=>{
-  if(!exploreMode) return;
-  mouseDragging = true;
-  lastMouseX = event.clientX;
-  lastMouseY = event.clientY;
-});
+window.addEventListener("touchmove",event=>{
+  if(!exploreMode || event.touches.length !== 2) return;
 
-window.addEventListener("mousemove",event=>{
-  if(!exploreMode || !mouseDragging) return;
-
-  const dx = event.clientX - lastMouseX;
-  const dy = event.clientY - lastMouseY;
-
-  rotY += dx * 0.45;
-  rotX += dy * 0.25;
-  rotX = Math.max(-70,Math.min(70,rotX));
-
-  lastMouseX = event.clientX;
-  lastMouseY = event.clientY;
-  applyExploreTransform();
-});
-
-window.addEventListener("mouseup",()=>{ mouseDragging = false; });
-
-touchLayer.addEventListener("wheel",event=>{
-  if(!exploreMode) return;
   event.preventDefault();
-  changeZoom(event.deltaY < 0 ? 1.10 : 0.90);
+
+  const a = event.touches[0];
+  const b = event.touches[1];
+
+  const d = Math.hypot(
+    b.clientX-a.clientX,
+    b.clientY-a.clientY
+  );
+
+  if(lastPinch){
+    zoomMultiplier *= d / lastPinch;
+    zoomMultiplier = Math.max(0.25,Math.min(4,zoomMultiplier));
+    applyExploreTransform();
+  }
+
+  lastPinch = d;
 },{passive:false});
 
-document.addEventListener("visibilitychange",()=>{
-  if(!document.hidden) setTimeout(forceVideoVisible,200);
-});
-
-window.addEventListener("error",event=>{
-  log("JS ERRO: " + event.message);
-});
-
-window.addEventListener("unhandledrejection",event=>{
-  log("PROMISE ERRO: " + String(event.reason));
-});
+window.addEventListener("touchend",()=>lastPinch=null);
 </script>
 </body>
 </html>
