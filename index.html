@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Bosque da Bruxa AR</title>
+
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    html,body{
+      margin:0;width:100%;height:100%;overflow:hidden;background:#000;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    }
+
+    video{
+      position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;
+      object-fit:cover!important;z-index:0!important;opacity:1!important;visibility:visible!important;
+      display:block!important;background:#000;
+    }
+
+    a-scene,.a-canvas{
+      position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;
+      z-index:2!important;background:transparent!important;
+    }
+
+    .mindar-ui-overlay{z-index:5!important}
+
+    #status{
+      position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+      z-index:70;color:#fff;background:rgba(0,0,0,.76);
+      padding:16px 20px;border-radius:16px;font-size:20px;font-weight:700;
+      line-height:1.35;text-align:center;width:min(86vw,420px);box-sizing:border-box;
+      pointer-events:none;backdrop-filter:blur(8px);
+    }
+
+    #status.ready{
+      top:auto;bottom:18px;transform:translateX(-50%);width:auto;max-width:88vw;
+      padding:10px 14px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap;
+    }
+
+    #retryBtn,#exitBtn{
+      position:fixed;top:16px;z-index:90;border:0;border-radius:999px;
+      padding:11px 15px;font-weight:700;font-size:14px;display:none;
+      touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+    }
+
+    #retryBtn{right:14px;background:#ffdf6c;color:#111}
+    #exitBtn{left:14px;background:rgba(0,0,0,.78);color:#fff}
+
+    #zoomControls{
+      position:fixed;right:16px;bottom:24px;z-index:90;display:none;
+      flex-direction:column;gap:10px;
+    }
+
+    #zoomControls button{
+      width:52px;height:52px;border:0;border-radius:50%;
+      background:rgba(255,255,255,.94);color:#111;font-size:30px;font-weight:700;
+      box-shadow:0 3px 12px rgba(0,0,0,.28);touch-action:manipulation;
+    }
+
+    #touchLayer{
+      position:fixed;inset:0;z-index:30;display:none;touch-action:none;background:transparent;
+    }
+
+    #debug{
+      display:none;position:fixed;left:8px;right:8px;top:70px;z-index:100;
+      color:#fff;background:rgba(0,0,0,.80);padding:9px 11px;border-radius:10px;
+      font-size:11px;line-height:1.4;white-space:pre-wrap;pointer-events:none;
+      max-height:38vh;overflow:auto;backdrop-filter:blur(8px);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="debug">Página carregada.</div>
+
+  <button id="retryBtn">Tentar novamente</button>
+  <button id="exitBtn">Sair</button>
+
+  <div id="zoomControls">
+    <button id="zoomInBtn" aria-label="Aumentar zoom">+</button>
+    <button id="zoomOutBtn" aria-label="Diminuir zoom">−</button>
+  </div>
+
+  <div id="touchLayer"></div>
+  <div id="status">Preparando experiência...</div>
+
+  <a-scene
+    id="scene"
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: yes; uiLoading: yes; uiError: yes; warmupTolerance: 3; missTolerance: 10; filterMinCF: 0.0005; filterBeta: 1000;"
+    embedded
+    vr-mode-ui="enabled:false"
+    device-orientation-permission-ui="enabled:false"
+    renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
+
+    <a-entity light="type:ambient; intensity:1.55; color:#ffffff"></a-entity>
+    <a-entity light="type:directional; intensity:1.35; color:#ffe8c2" position="-2 4 3"></a-entity>
+
+    <!-- Modelo usado apenas durante o reconhecimento -->
+    <a-entity id="target" mindar-image-target="targetIndex:0">
+      <a-entity id="arHolder">
+        <a-entity id="arModel"></a-entity>
+      </a-entity>
+    </a-entity>
+
+    <!--
+      Diorama realmente preso à câmera.
+      Como é filho da câmera, não recebe nenhuma oscilação do rastreamento do alvo.
+    -->
+    <a-camera id="camera" position="0 0 0" look-controls="enabled:false">
+      <a-entity id="fixedRoot" visible="false" position="0 0 -3">
+        <a-entity id="fixedHolder">
+          <a-entity id="fixedModel"></a-entity>
+        </a-entity>
+      </a-entity>
+    </a-camera>
+  </a-scene>
+
+<script>
+const MODEL_PATH = "./Casa_da_bruxa_web.glb";
+
+const scene = document.getElementById("scene");
+const target = document.getElementById("target");
+const arModel = document.getElementById("arModel");
+const arHolder = document.getElementById("arHolder");
+
+const fixedRoot = document.getElementById("fixedRoot");
+const fixedHolder = document.getElementById("fixedHolder");
+const fixedModel = document.getElementById("fixedModel");
+
+const statusEl = document.getElementById("status");
+const debugEl = document.getElementById("debug");
+const retryBtn = document.getElementById("retryBtn");
+const exitBtn = document.getElementById("exitBtn");
+const zoomControls = document.getElementById("zoomControls");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const touchLayer = document.getElementById("touchLayer");
+
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+if(DEBUG) debugEl.style.display = "block";
+
+let modelReady = false;
+let modelLoading = false;
+let cameraStarted = false;
+let targetSeen = false;
+
+let fixedMode = false;
+let waitingForRearm = false;
+let lockTimer = null;
+let targetLostTimer = null;
+
+let fixedBaseScale = 1;
+let fixedZoomMultiplier = 1;
+let fixedRotX = -6;
+let fixedRotY = 0;
+
+let lastTouchX = 0;
+let lastTouchY = 0;
+
+function log(msg){
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent += "\n" + msg;
+    debugEl.scrollTop = debugEl.scrollHeight;
+  }
+}
+
+function setStatus(msg){ statusEl.textContent = msg; }
+
+function forceVideoVisible(){
+  document.querySelectorAll("video").forEach(video=>{
+    video.setAttribute("playsinline","");
+    video.setAttribute("autoplay","");
+    video.muted = true;
+    Object.assign(video.style,{
+      position:"fixed",inset:"0",width:"100vw",height:"100vh",
+      objectFit:"cover",zIndex:"0",opacity:"1",visibility:"visible",display:"block"
+    });
+    if(video.paused) video.play().catch(()=>{});
+  });
+}
+setInterval(forceVideoVisible,700);
+
+function fitAR(){
+  const mesh = arModel.getObject3D("mesh");
+  if(!mesh) return false;
+
+  mesh.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x,size.y,size.z);
+  if(!isFinite(maxDim) || maxDim <= 0) return false;
+
+  arModel.object3D.position.set(-center.x,-center.y,-center.z);
+
+  const s = 0.72 / maxDim;
+  arHolder.object3D.scale.set(s,s,s);
+  arHolder.object3D.position.set(0,0,0);
+  arHolder.object3D.rotation.set(THREE.MathUtils.degToRad(-8),0,0);
+
+  return true;
+}
+
+function prepareFixedClone(){
+  const source = arModel.getObject3D("mesh");
+  if(!source) return false;
+
+  const clone = source.clone(true);
+  fixedModel.removeObject3D("mesh");
+  fixedModel.setObject3D("mesh",clone);
+
+  clone.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(clone);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x,size.y,size.z);
+  if(!isFinite(maxDim) || maxDim <= 0) return false;
+
+  fixedModel.object3D.position.set(-center.x,-center.y,-center.z);
+
+  fixedBaseScale = 1.55 / maxDim;
+  fixedZoomMultiplier = 1;
+  fixedRotX = -6;
+  fixedRotY = 0;
+
+  applyFixedTransform();
+  fixedHolder.object3D.position.set(0,-0.10,0);
+
+  return true;
+}
+
+function applyFixedTransform(){
+  fixedHolder.object3D.rotation.set(
+    THREE.MathUtils.degToRad(fixedRotX),
+    THREE.MathUtils.degToRad(fixedRotY),
+    0
+  );
+
+  const s = fixedBaseScale * fixedZoomMultiplier;
+  fixedHolder.object3D.scale.set(s,s,s);
+}
+
+function loadModel(){
+  if(modelLoading || modelReady) return;
+
+  modelLoading = true;
+  retryBtn.style.display = "none";
+  setStatus("Baixando cenário 3D...");
+
+  const url = MODEL_PATH + "?v=" + Date.now();
+
+  arModel.removeAttribute("gltf-model");
+  setTimeout(()=>arModel.setAttribute("gltf-model",url),50);
+}
+
+arModel.addEventListener("model-loaded",async ()=>{
+  try{
+    if(!fitAR()) throw new Error("Falha ao ajustar AR");
+    if(!prepareFixedClone()) throw new Error("Falha ao preparar diorama fixo");
+
+    modelReady = true;
+    modelLoading = false;
+
+    setStatus("Cenário pronto. Abrindo câmera...");
+
+    if(!cameraStarted){
+      cameraStarted = true;
+      const mindarSystem = scene.systems["mindar-image-system"];
+      await mindarSystem.start();
+    }
+  }catch(err){
+    modelReady = false;
+    modelLoading = false;
+    cameraStarted = false;
+    log("ERRO: " + err.message);
+    setStatus("Erro ao preparar o cenário.");
+    retryBtn.style.display = "block";
+  }
+});
+
+arModel.addEventListener("model-error",()=>{
+  modelReady = false;
+  modelLoading = false;
+  setStatus("Erro ao abrir o cenário 3D.");
+  retryBtn.style.display = "block";
+});
+
+scene.addEventListener("loaded",()=>{
+  setTimeout(loadModel,150);
+});
+
+scene.addEventListener("arReady",()=>{
+  statusEl.classList.add("ready");
+  setStatus("Agora aponte a câmera para a imagem.");
+});
+
+scene.addEventListener("arError",()=>{
+  cameraStarted = false;
+  setStatus("Erro ao iniciar câmera/AR.");
+  retryBtn.style.display = "block";
+});
+
+function enterFixedDiorama(){
+  if(fixedMode || waitingForRearm || !modelReady) return;
+
+  fixedMode = true;
+
+  // Desliga visualmente tudo que ainda acompanha o rastreamento.
+  arHolder.object3D.visible = false;
+  target.object3D.visible = false;
+  target.setAttribute("visible",false);
+
+  fixedZoomMultiplier = 1;
+  fixedRotX = -6;
+  fixedRotY = 0;
+  applyFixedTransform();
+
+  fixedRoot.setAttribute("visible",true);
+  fixedRoot.object3D.visible = true;
+
+  touchLayer.style.display = "block";
+  zoomControls.style.display = "flex";
+  exitBtn.style.display = "block";
+
+  setStatus("Diorama travado na tela • 1 dedo gira 360° • use − / + para zoom");
+}
+
+function exitFixedDiorama(){
+  fixedMode = false;
+  waitingForRearm = true;
+
+  touchLayer.style.display = "none";
+  zoomControls.style.display = "none";
+  exitBtn.style.display = "none";
+
+  fixedRoot.setAttribute("visible",false);
+  fixedRoot.object3D.visible = false;
+
+  arHolder.object3D.visible = false;
+  target.object3D.visible = true;
+  target.setAttribute("visible",true);
+
+  setStatus("Afaste a câmera e aponte novamente para a imagem.");
+}
+
+target.addEventListener("targetFound",()=>{
+  targetSeen = true;
+
+  if(targetLostTimer){
+    clearTimeout(targetLostTimer);
+    targetLostTimer = null;
+  }
+
+  if(waitingForRearm || fixedMode) return;
+
+  arHolder.object3D.visible = true;
+  setStatus("Imagem reconhecida. Fixando diorama...");
+
+  if(lockTimer) clearTimeout(lockTimer);
+
+  lockTimer = setTimeout(()=>{
+    if(targetSeen && !waitingForRearm && !fixedMode){
+      enterFixedDiorama();
+    }
+  },400);
+});
+
+target.addEventListener("targetLost",()=>{
+  if(targetLostTimer) clearTimeout(targetLostTimer);
+
+  targetLostTimer = setTimeout(()=>{
+    targetSeen = false;
+
+    if(lockTimer){
+      clearTimeout(lockTimer);
+      lockTimer = null;
+    }
+
+    if(waitingForRearm){
+      waitingForRearm = false;
+      setStatus("Agora aponte novamente para a imagem.");
+    }else if(!fixedMode){
+      arHolder.object3D.visible = false;
+      if(modelReady) setStatus("Aponte novamente para a imagem.");
+    }
+
+    targetLostTimer = null;
+  },250);
+});
+
+function changeZoom(factor){
+  if(!fixedMode) return;
+  fixedZoomMultiplier *= factor;
+  fixedZoomMultiplier = Math.max(0.35,Math.min(4.0,fixedZoomMultiplier));
+  applyFixedTransform();
+}
+
+zoomInBtn.addEventListener("click",()=>changeZoom(1.15));
+zoomOutBtn.addEventListener("click",()=>changeZoom(1/1.15));
+exitBtn.addEventListener("click",exitFixedDiorama);
+
+touchLayer.addEventListener("touchstart",event=>{
+  if(!fixedMode || event.touches.length !== 1) return;
+  event.preventDefault();
+  lastTouchX = event.touches[0].clientX;
+  lastTouchY = event.touches[0].clientY;
+},{passive:false});
+
+touchLayer.addEventListener("touchmove",event=>{
+  if(!fixedMode || event.touches.length !== 1) return;
+  event.preventDefault();
+
+  const t = event.touches[0];
+  const dx = t.clientX - lastTouchX;
+  const dy = t.clientY - lastTouchY;
+
+  fixedRotY += dx * 0.45;
+  fixedRotX += dy * 0.22;
+  fixedRotX = Math.max(-60,Math.min(60,fixedRotX));
+
+  lastTouchX = t.clientX;
+  lastTouchY = t.clientY;
+
+  applyFixedTransform();
+},{passive:false});
+
+retryBtn.addEventListener("click",async ()=>{
+  retryBtn.style.display = "none";
+
+  if(!modelReady){
+    loadModel();
+    return;
+  }
+
+  if(!cameraStarted){
+    try{
+      cameraStarted = true;
+      const mindarSystem = scene.systems["mindar-image-system"];
+      await mindarSystem.start();
+    }catch(err){
+      cameraStarted = false;
+      setStatus("Erro ao iniciar câmera.");
+      retryBtn.style.display = "block";
+    }
+  }
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden) setTimeout(forceVideoVisible,200);
+});
+
+window.addEventListener("error",event=>{
+  log("JS ERRO: " + event.message);
+});
+
+window.addEventListener("unhandledrejection",event=>{
+  log("PROMISE ERRO: " + String(event.reason));
+});
+</script>
+</body>
+</html>
