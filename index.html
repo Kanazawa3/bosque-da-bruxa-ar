@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bosque da Bruxa AR</title>
+
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+<style>
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+
+video{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  object-fit:cover!important;
+  z-index:0!important;
+  display:block!important;
+  opacity:1!important;
+  visibility:visible!important;
+  background:#000;
+}
+
+/* MindAR fica atrás */
+a-scene,.a-canvas{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  z-index:2!important;
+  background:transparent!important;
+}
+
+.mindar-ui-overlay{
+  z-index:5!important;
+}
+
+/*
+  NOVO:
+  canvas completamente separado do A-Frame/MindAR.
+  É aqui que o diorama será desenhado.
+*/
+#viewerCanvas{
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh;
+  z-index:30;
+  display:none;
+  background:transparent;
+  touch-action:none;
+  cursor:grab;
+}
+
+#viewerCanvas.dragging{
+  cursor:grabbing;
+}
+
+#status{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:80;
+  width:min(88vw,440px);
+  box-sizing:border-box;
+  color:#fff;
+  background:rgba(0,0,0,.76);
+  padding:16px 20px;
+  border-radius:16px;
+  font-size:20px;
+  font-weight:700;
+  line-height:1.35;
+  text-align:center;
+  pointer-events:none;
+  backdrop-filter:blur(8px);
+}
+
+#status.ready{
+  top:auto;
+  bottom:18px;
+  transform:translateX(-50%);
+  width:auto;
+  max-width:90vw;
+  padding:10px 14px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+#exitBtn,#retryBtn{
+  position:fixed;
+  top:16px;
+  z-index:100;
+  border:0;
+  border-radius:999px;
+  padding:11px 16px;
+  font-size:14px;
+  font-weight:700;
+  display:none;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+#exitBtn{
+  left:14px;
+  background:rgba(0,0,0,.82);
+  color:#fff;
+}
+
+#retryBtn{
+  right:14px;
+  background:#ffdf6c;
+  color:#111;
+}
+
+#zoomControls{
+  position:fixed;
+  right:16px;
+  bottom:24px;
+  z-index:100;
+  display:none;
+  flex-direction:column;
+  gap:10px;
+}
+
+#zoomControls button{
+  width:58px;
+  height:58px;
+  border:0;
+  border-radius:50%;
+  background:rgba(255,255,255,.96);
+  color:#111;
+  font-size:32px;
+  line-height:1;
+  font-weight:700;
+  box-shadow:0 3px 12px rgba(0,0,0,.30);
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+#debug{
+  display:none;
+  position:fixed;
+  left:8px;
+  right:8px;
+  top:70px;
+  z-index:120;
+  max-height:38vh;
+  overflow:auto;
+  color:#fff;
+  background:rgba(0,0,0,.82);
+  padding:9px 11px;
+  border-radius:10px;
+  font-size:11px;
+  line-height:1.4;
+  white-space:pre-wrap;
+  pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="viewerCanvas"></canvas>
+
+<div id="debug">Página carregada.</div>
+
+<button id="exitBtn">Sair</button>
+<button id="retryBtn">Tentar novamente</button>
+
+<div id="zoomControls">
+  <button id="zoomInBtn" aria-label="Aumentar">+</button>
+  <button id="zoomOutBtn" aria-label="Diminuir">−</button>
+</div>
+
+<div id="status">Preparando experiência...</div>
+
+<a-scene
+  id="arScene"
+  mindar-image="
+    imageTargetSrc: ./targets.mind;
+    autoStart: false;
+    uiScanning: yes;
+    uiLoading: yes;
+    uiError: yes;
+    warmupTolerance: 3;
+    missTolerance: 10;
+    filterMinCF: 0.0005;
+    filterBeta: 1000;
+  "
+  embedded
+  vr-mode-ui="enabled:false"
+  device-orientation-permission-ui="enabled:false"
+  renderer="alpha:true; antialias:true; colorManagement:true">
+
+  <!-- GLB só é carregado aqui para reaproveitar o loader estável do A-Frame -->
+  <a-entity id="sourceModel" visible="false"></a-entity>
+
+  <!-- Target serve SOMENTE como gatilho -->
+  <a-entity id="target" mindar-image-target="targetIndex:0"></a-entity>
+
+  <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
+</a-scene>
+
+<script>
+const MODEL_PATH = "./Casa_da_bruxa_web.glb";
+
+const arScene = document.getElementById("arScene");
+const sourceModel = document.getElementById("sourceModel");
+const target = document.getElementById("target");
+
+const viewerCanvas = document.getElementById("viewerCanvas");
+const statusEl = document.getElementById("status");
+const debugEl = document.getElementById("debug");
+const exitBtn = document.getElementById("exitBtn");
+const retryBtn = document.getElementById("retryBtn");
+const zoomControls = document.getElementById("zoomControls");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+if(DEBUG) debugEl.style.display = "block";
+
+let modelReady = false;
+let modelLoading = false;
+let cameraStarted = false;
+
+let targetSeen = false;
+let dioramaOpen = false;
+let waitingForRearm = false;
+
+let openTimer = null;
+let targetLostTimer = null;
+
+/* Viewer independente */
+let viewerRenderer = null;
+let viewerScene = null;
+let viewerCamera = null;
+let modelRoot = null;
+let modelObject = null;
+
+let baseScale = 1;
+let zoom = 1;
+let rotX = -8;
+let rotY = 0;
+
+let dragging = false;
+let activePointerId = null;
+let lastX = 0;
+let lastY = 0;
+
+function log(msg){
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent += "\n" + msg;
+    debugEl.scrollTop = debugEl.scrollHeight;
+  }
+}
+
+function setStatus(msg){
+  statusEl.textContent = msg;
+}
+
+function forceVideoVisible(){
+  document.querySelectorAll("video").forEach(v=>{
+    v.setAttribute("playsinline","");
+    v.setAttribute("autoplay","");
+    v.muted = true;
+
+    Object.assign(v.style,{
+      position:"fixed",
+      inset:"0",
+      width:"100vw",
+      height:"100vh",
+      objectFit:"cover",
+      zIndex:"0",
+      display:"block",
+      opacity:"1",
+      visibility:"visible"
+    });
+
+    if(v.paused){
+      v.play().catch(()=>{});
+    }
+  });
+}
+
+setInterval(forceVideoVisible,700);
+
+/* =========================================================
+   VIEWER 3D COMPLETAMENTE SEPARADO DO MINDAR
+   ========================================================= */
+
+function createViewer(){
+  if(viewerRenderer) return;
+
+  const THREE = AFRAME.THREE;
+
+  viewerRenderer = new THREE.WebGLRenderer({
+    canvas: viewerCanvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: false
+  });
+
+  viewerRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  viewerRenderer.setClearColor(0x000000, 0);
+
+  if("outputColorSpace" in viewerRenderer){
+    viewerRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  }
+
+  viewerScene = new THREE.Scene();
+
+  viewerCamera = new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.01,
+    100
+  );
+
+  viewerCamera.position.set(0,0,4.2);
+  viewerCamera.lookAt(0,0,0);
+
+  /* Iluminação mais clara */
+  const ambient = new THREE.AmbientLight(0xffffff, 2.1);
+  viewerScene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xffffff, 2.0);
+  key.position.set(3,5,5);
+  viewerScene.add(key);
+
+  const fill = new THREE.DirectionalLight(0xffe8cf, 1.0);
+  fill.position.set(-4,2,2);
+  viewerScene.add(fill);
+
+  modelRoot = new THREE.Group();
+  viewerScene.add(modelRoot);
+
+  resizeViewer();
+
+  /* loop independente */
+  function renderLoop(){
+    requestAnimationFrame(renderLoop);
+
+    if(
+      viewerRenderer &&
+      viewerScene &&
+      viewerCamera &&
+      dioramaOpen
+    ){
+      viewerRenderer.render(viewerScene,viewerCamera);
+    }
+  }
+
+  renderLoop();
+
+  log("Viewer separado criado.");
+}
+
+function resizeViewer(){
+  if(!viewerRenderer || !viewerCamera) return;
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  viewerRenderer.setSize(w,h,false);
+
+  viewerCamera.aspect = w/h;
+  viewerCamera.updateProjectionMatrix();
+}
+
+window.addEventListener("resize",resizeViewer);
+
+function prepareModelForViewer(){
+  const THREE = AFRAME.THREE;
+
+  const source = sourceModel.getObject3D("mesh");
+
+  if(!source){
+    throw new Error("Mesh do GLB não encontrado.");
+  }
+
+  createViewer();
+
+  /* Limpa o modelo anterior */
+  while(modelRoot.children.length){
+    modelRoot.remove(modelRoot.children[0]);
+  }
+
+  modelObject = source.clone(true);
+
+  /*
+    Como materiais/texturas já foram carregados pelo A-Frame,
+    o clone reaproveita esses recursos.
+  */
+  modelRoot.add(modelObject);
+
+  modelObject.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(modelObject);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x,size.y,size.z);
+
+  if(!isFinite(maxDim) || maxDim <= 0){
+    throw new Error("Dimensões inválidas do GLB.");
+  }
+
+  /*
+    Centraliza geometricamente.
+  */
+  modelObject.position.x -= center.x;
+  modelObject.position.y -= center.y;
+  modelObject.position.z -= center.z;
+
+  /*
+    Escala inicial pensada para ocupar uma boa área da tela.
+  */
+  baseScale = 2.25 / maxDim;
+
+  resetViewerTransform();
+
+  modelRoot.visible = false;
+
+  log(
+    "Modelo preparado no viewer independente: " +
+    size.x.toFixed(2) + " x " +
+    size.y.toFixed(2) + " x " +
+    size.z.toFixed(2)
+  );
+}
+
+function resetViewerTransform(){
+  zoom = 1;
+  rotX = -8;
+  rotY = 0;
+
+  modelRoot.position.set(0,-0.10,0);
+
+  applyViewerTransform();
+}
+
+function applyViewerTransform(){
+  if(!modelRoot) return;
+
+  modelRoot.rotation.set(
+    AFRAME.THREE.MathUtils.degToRad(rotX),
+    AFRAME.THREE.MathUtils.degToRad(rotY),
+    0
+  );
+
+  const s = baseScale * zoom;
+  modelRoot.scale.set(s,s,s);
+}
+
+/* =========================================================
+   CARREGAMENTO
+   ========================================================= */
+
+function loadModel(){
+  if(modelLoading || modelReady) return;
+
+  modelLoading = true;
+  retryBtn.style.display = "none";
+
+  setStatus("Baixando cenário 3D...");
+
+  sourceModel.removeAttribute("gltf-model");
+
+  const url = MODEL_PATH + "?v=" + Date.now();
+
+  setTimeout(()=>{
+    sourceModel.setAttribute("gltf-model",url);
+  },50);
+}
+
+async function startAR(){
+  if(cameraStarted) return;
+
+  try{
+    cameraStarted = true;
+
+    setStatus("Cenário pronto. Abrindo câmera...");
+
+    const system = arScene.systems["mindar-image-system"];
+
+    if(!system || typeof system.start !== "function"){
+      throw new Error("MindAR indisponível.");
+    }
+
+    await system.start();
+
+  }catch(err){
+    cameraStarted = false;
+
+    log("Erro câmera: " + err.message);
+
+    setStatus("Erro ao iniciar câmera.");
+    retryBtn.style.display = "block";
+  }
+}
+
+sourceModel.addEventListener("model-loaded",async()=>{
+  try{
+    prepareModelForViewer();
+
+    modelReady = true;
+    modelLoading = false;
+
+    await startAR();
+
+  }catch(err){
+    modelReady = false;
+    modelLoading = false;
+
+    log("Erro modelo: " + err.message);
+
+    setStatus("Erro ao preparar cenário 3D.");
+    retryBtn.style.display = "block";
+  }
+});
+
+sourceModel.addEventListener("model-error",()=>{
+  modelReady = false;
+  modelLoading = false;
+
+  setStatus("Erro ao abrir cenário 3D.");
+  retryBtn.style.display = "block";
+});
+
+arScene.addEventListener("loaded",()=>{
+  setTimeout(loadModel,150);
+});
+
+arScene.addEventListener("arReady",()=>{
+  statusEl.classList.add("ready");
+
+  setStatus("Agora aponte a câmera para a imagem.");
+
+  forceVideoVisible();
+
+  log("MindAR pronto.");
+});
+
+arScene.addEventListener("arError",()=>{
+  cameraStarted = false;
+
+  setStatus("Erro ao iniciar câmera/AR.");
+  retryBtn.style.display = "block";
+});
+
+/* =========================================================
+   ABRIR / FECHAR
+   ========================================================= */
+
+function openDiorama(){
+  if(
+    !modelReady ||
+    !modelRoot ||
+    dioramaOpen ||
+    waitingForRearm
+  ){
+    return;
+  }
+
+  dioramaOpen = true;
+
+  resetViewerTransform();
+
+  modelRoot.visible = true;
+
+  viewerCanvas.style.display = "block";
+  zoomControls.style.display = "flex";
+  exitBtn.style.display = "block";
+
+  setStatus("Diorama fixo • arraste com 1 dedo • use − / + para zoom");
+
+  log("Diorama aberto no canvas independente.");
+}
+
+function closeDiorama(){
+  if(!dioramaOpen) return;
+
+  dioramaOpen = false;
+  waitingForRearm = true;
+
+  dragging = false;
+  activePointerId = null;
+
+  if(openTimer){
+    clearTimeout(openTimer);
+    openTimer = null;
+  }
+
+  if(modelRoot){
+    modelRoot.visible = false;
+  }
+
+  viewerCanvas.style.display = "none";
+  viewerCanvas.classList.remove("dragging");
+
+  zoomControls.style.display = "none";
+  exitBtn.style.display = "none";
+
+  setStatus("Afaste a câmera e aponte novamente para a imagem.");
+
+  log("Diorama fechado.");
+}
+
+/* =========================================================
+   RECONHECIMENTO: SOMENTE GATILHO
+   ========================================================= */
+
+target.addEventListener("targetFound",()=>{
+  targetSeen = true;
+
+  if(targetLostTimer){
+    clearTimeout(targetLostTimer);
+    targetLostTimer = null;
+  }
+
+  if(waitingForRearm || dioramaOpen) return;
+
+  setStatus("Imagem reconhecida. Abrindo diorama...");
+
+  if(openTimer){
+    clearTimeout(openTimer);
+  }
+
+  openTimer = setTimeout(()=>{
+    if(targetSeen && !waitingForRearm && !dioramaOpen){
+      openDiorama();
+    }
+  },350);
+});
+
+target.addEventListener("targetLost",()=>{
+  if(targetLostTimer){
+    clearTimeout(targetLostTimer);
+  }
+
+  targetLostTimer = setTimeout(()=>{
+    targetSeen = false;
+
+    if(openTimer){
+      clearTimeout(openTimer);
+      openTimer = null;
+    }
+
+    /*
+      Só rearma depois de realmente perder o alvo.
+    */
+    if(waitingForRearm){
+      waitingForRearm = false;
+      setStatus("Agora aponte novamente para a imagem.");
+      log("Sistema rearmado.");
+    }
+
+    targetLostTimer = null;
+
+  },250);
+});
+
+/* =========================================================
+   GIRO COM O DEDO DIRETAMENTE NO CANVAS
+   ========================================================= */
+
+viewerCanvas.addEventListener("pointerdown",event=>{
+  if(!dioramaOpen) return;
+
+  event.preventDefault();
+
+  dragging = true;
+  activePointerId = event.pointerId;
+
+  lastX = event.clientX;
+  lastY = event.clientY;
+
+  viewerCanvas.classList.add("dragging");
+
+  try{
+    viewerCanvas.setPointerCapture(event.pointerId);
+  }catch(e){}
+});
+
+viewerCanvas.addEventListener("pointermove",event=>{
+  if(
+    !dioramaOpen ||
+    !dragging ||
+    event.pointerId !== activePointerId
+  ){
+    return;
+  }
+
+  event.preventDefault();
+
+  const dx = event.clientX - lastX;
+  const dy = event.clientY - lastY;
+
+  /*
+    Horizontal ilimitado.
+  */
+  rotY += dx * 0.48;
+
+  /*
+    Inclinação vertical limitada.
+  */
+  rotX += dy * 0.24;
+  rotX = Math.max(-60,Math.min(60,rotX));
+
+  lastX = event.clientX;
+  lastY = event.clientY;
+
+  applyViewerTransform();
+});
+
+function endDrag(event){
+  if(event.pointerId !== activePointerId) return;
+
+  dragging = false;
+  activePointerId = null;
+
+  viewerCanvas.classList.remove("dragging");
+
+  try{
+    viewerCanvas.releasePointerCapture(event.pointerId);
+  }catch(e){}
+}
+
+viewerCanvas.addEventListener("pointerup",endDrag);
+viewerCanvas.addEventListener("pointercancel",endDrag);
+
+/*
+  Fallback específico de touch para aparelhos
+  onde PointerEvent estiver inconsistente.
+*/
+viewerCanvas.addEventListener("touchstart",event=>{
+  if(!dioramaOpen || event.touches.length !== 1) return;
+
+  event.preventDefault();
+
+  const t = event.touches[0];
+
+  lastX = t.clientX;
+  lastY = t.clientY;
+
+  dragging = true;
+
+},{passive:false});
+
+viewerCanvas.addEventListener("touchmove",event=>{
+  if(!dioramaOpen || !dragging || event.touches.length !== 1) return;
+
+  event.preventDefault();
+
+  const t = event.touches[0];
+
+  const dx = t.clientX - lastX;
+  const dy = t.clientY - lastY;
+
+  rotY += dx * 0.48;
+
+  rotX += dy * 0.24;
+  rotX = Math.max(-60,Math.min(60,rotX));
+
+  lastX = t.clientX;
+  lastY = t.clientY;
+
+  applyViewerTransform();
+
+},{passive:false});
+
+viewerCanvas.addEventListener("touchend",()=>{
+  dragging = false;
+},{passive:false});
+
+/* =========================================================
+   ZOOM
+   ========================================================= */
+
+function changeZoom(factor){
+  if(!dioramaOpen || !modelRoot) return;
+
+  zoom *= factor;
+
+  zoom = Math.max(0.35,Math.min(4.0,zoom));
+
+  applyViewerTransform();
+}
+
+zoomInBtn.addEventListener("click",event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  changeZoom(1.15);
+});
+
+zoomOutBtn.addEventListener("click",event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  changeZoom(1/1.15);
+});
+
+exitBtn.addEventListener("click",event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  closeDiorama();
+});
+
+/* mouse wheel no computador */
+viewerCanvas.addEventListener("wheel",event=>{
+  if(!dioramaOpen) return;
+
+  event.preventDefault();
+
+  changeZoom(event.deltaY < 0 ? 1.10 : 0.90);
+
+},{passive:false});
+
+/* =========================================================
+   RETRY
+   ========================================================= */
+
+retryBtn.addEventListener("click",async()=>{
+  retryBtn.style.display = "none";
+
+  if(!modelReady){
+    modelLoading = false;
+    loadModel();
+    return;
+  }
+
+  if(!cameraStarted){
+    await startAR();
+  }
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden){
+    setTimeout(forceVideoVisible,200);
+  }
+});
+
+window.addEventListener("error",event=>{
+  log("JS ERRO: " + event.message);
+});
+
+window.addEventListener("unhandledrejection",event=>{
+  log("PROMISE ERRO: " + String(event.reason));
+});
+</script>
+
+</body>
+</html>
