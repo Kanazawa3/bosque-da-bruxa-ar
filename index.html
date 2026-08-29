@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bosque da Bruxa AR</title>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body.diorama-open{touch-action:none}
+video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;object-fit:cover!important;z-index:0!important;opacity:1!important;visibility:visible!important;display:block!important;background:#000}
+a-scene,.a-canvas{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:2!important;background:transparent!important}
+.mindar-ui-overlay{z-index:5!important}
+#status{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;width:min(86vw,420px);box-sizing:border-box;color:#fff;background:rgba(0,0,0,.76);padding:16px 20px;border-radius:16px;font-size:20px;font-weight:700;line-height:1.35;text-align:center;pointer-events:none;backdrop-filter:blur(8px)}
+#status.ready{top:auto;bottom:18px;transform:translateX(-50%);width:auto;max-width:88vw;padding:10px 14px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap}
+#exitBtn,#retryBtn{position:fixed;top:16px;z-index:100;border:0;border-radius:999px;padding:11px 15px;font-weight:700;font-size:14px;display:none;touch-action:manipulation}
+#exitBtn{left:14px;background:rgba(0,0,0,.82);color:#fff}
+#retryBtn{right:14px;background:#ffdf6c;color:#111}
+#zoomControls{position:fixed;right:16px;bottom:24px;z-index:100;display:none;flex-direction:column;gap:10px}
+#zoomControls button{width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.96);color:#111;font-size:31px;font-weight:700;line-height:1;box-shadow:0 3px 12px rgba(0,0,0,.28);touch-action:manipulation}
+#debug{display:none;position:fixed;left:8px;right:8px;top:70px;z-index:120;color:#fff;background:rgba(0,0,0,.82);padding:9px 11px;border-radius:10px;font-size:11px;line-height:1.4;white-space:pre-wrap;pointer-events:none;max-height:38vh;overflow:auto}
+</style>
+</head>
+<body>
+<div id="debug">Página carregada.</div>
+<button id="exitBtn">Sair</button>
+<button id="retryBtn">Tentar novamente</button>
+<div id="zoomControls">
+  <button id="zoomInBtn">+</button>
+  <button id="zoomOutBtn">−</button>
+</div>
+<div id="status">Preparando experiência...</div>
+
+<a-scene id="scene"
+  mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: yes; uiLoading: yes; uiError: yes; warmupTolerance: 3; missTolerance: 10; filterMinCF: 0.0005; filterBeta: 1000;"
+  embedded
+  vr-mode-ui="enabled:false"
+  device-orientation-permission-ui="enabled:false"
+  renderer="alpha:true; antialias:true; colorManagement:true; physicallyCorrectLights:true">
+
+  <a-entity light="type:ambient; intensity:1.90; color:#ffffff"></a-entity>
+  <a-entity light="type:directional; intensity:1.50; color:#fff1dc" position="-2 4 3"></a-entity>
+
+  <a-entity id="preloadModel" visible="false"></a-entity>
+  <a-entity id="target" mindar-image-target="targetIndex:0"></a-entity>
+  <a-camera id="aframeCamera" position="0 0 0" look-controls="enabled:false"></a-camera>
+</a-scene>
+
+<script>
+const MODEL_PATH="./Casa_da_bruxa_web.glb";
+
+const scene=document.getElementById("scene");
+const target=document.getElementById("target");
+const preloadModel=document.getElementById("preloadModel");
+const statusEl=document.getElementById("status");
+const debugEl=document.getElementById("debug");
+const exitBtn=document.getElementById("exitBtn");
+const retryBtn=document.getElementById("retryBtn");
+const zoomControls=document.getElementById("zoomControls");
+const zoomInBtn=document.getElementById("zoomInBtn");
+const zoomOutBtn=document.getElementById("zoomOutBtn");
+
+const DEBUG=new URLSearchParams(location.search).get("debug")==="1";
+if(DEBUG)debugEl.style.display="block";
+
+let modelReady=false,modelLoading=false,cameraStarted=false;
+let targetSeen=false,dioramaOpen=false,waitingForRearm=false;
+let targetLostTimer=null,openTimer=null;
+let camera3D=null,hudRoot=null,hudModel=null;
+let baseScale=1,zoomMultiplier=1,rotX=-6,rotY=0;
+let dragging=false,activePointerId=null,lastX=0,lastY=0;
+
+function log(msg){
+  console.log(msg);
+  if(DEBUG){
+    debugEl.textContent+="\n"+msg;
+    debugEl.scrollTop=debugEl.scrollHeight;
+  }
+}
+function setStatus(msg){statusEl.textContent=msg}
+
+function forceVideoVisible(){
+  document.querySelectorAll("video").forEach(video=>{
+    video.setAttribute("playsinline","");
+    video.setAttribute("autoplay","");
+    video.muted=true;
+    Object.assign(video.style,{position:"fixed",inset:"0",width:"100vw",height:"100vh",objectFit:"cover",zIndex:"0",opacity:"1",visibility:"visible",display:"block"});
+    if(video.paused)video.play().catch(()=>{});
+  });
+}
+setInterval(forceVideoVisible,700);
+
+function resetHUDTransform(){
+  if(!hudRoot)return;
+  zoomMultiplier=1;rotX=-6;rotY=0;
+  hudRoot.position.set(0,-0.08,-3);
+  applyHUDTransform();
+}
+
+function applyHUDTransform(){
+  if(!hudRoot)return;
+  hudRoot.rotation.set(THREE.MathUtils.degToRad(rotX),THREE.MathUtils.degToRad(rotY),0);
+  const s=baseScale*zoomMultiplier;
+  hudRoot.scale.set(s,s,s);
+}
+
+function buildHUDFromLoadedModel(){
+  const source=preloadModel.getObject3D("mesh");
+  if(!source)throw new Error("Mesh do GLB não encontrado.");
+  if(!scene.camera)throw new Error("Câmera Three.js ainda não disponível.");
+
+  camera3D=scene.camera;
+
+  if(hudRoot&&hudRoot.parent)hudRoot.parent.remove(hudRoot);
+
+  hudRoot=new THREE.Group();
+  hudRoot.visible=false;
+
+  hudModel=source.clone(true);
+  hudRoot.add(hudModel);
+  hudModel.updateMatrixWorld(true);
+
+  const box=new THREE.Box3().setFromObject(hudModel);
+  const size=new THREE.Vector3();
+  const center=new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim=Math.max(size.x,size.y,size.z);
+  if(!isFinite(maxDim)||maxDim<=0)throw new Error("Dimensões inválidas.");
+
+  hudModel.position.x-=center.x;
+  hudModel.position.y-=center.y;
+  hudModel.position.z-=center.z;
+
+  baseScale=1.55/maxDim;
+
+  camera3D.add(hudRoot);
+  resetHUDTransform();
+
+  log("HUD anexado diretamente a scene.camera.");
+}
+
+function loadModel(){
+  if(modelLoading||modelReady)return;
+  modelLoading=true;
+  retryBtn.style.display="none";
+  setStatus("Baixando cenário 3D...");
+  const url=MODEL_PATH+"?v="+Date.now();
+  preloadModel.removeAttribute("gltf-model");
+  setTimeout(()=>preloadModel.setAttribute("gltf-model",url),50);
+}
+
+async function startCamera(){
+  if(cameraStarted)return;
+  try{
+    cameraStarted=true;
+    setStatus("Cenário pronto. Abrindo câmera...");
+    const mindarSystem=scene.systems["mindar-image-system"];
+    if(!mindarSystem||typeof mindarSystem.start!=="function")throw new Error("Sistema MindAR indisponível.");
+    await mindarSystem.start();
+  }catch(err){
+    cameraStarted=false;
+    log("Erro ao abrir câmera: "+err.message);
+    setStatus("Erro ao iniciar câmera.");
+    retryBtn.style.display="block";
+  }
+}
+
+preloadModel.addEventListener("model-loaded",async()=>{
+  try{
+    buildHUDFromLoadedModel();
+    modelReady=true;
+    modelLoading=false;
+    await startCamera();
+  }catch(err){
+    modelReady=false;
+    modelLoading=false;
+    log("Erro ao preparar GLB: "+err.message);
+    setStatus("Erro ao preparar o cenário 3D.");
+    retryBtn.style.display="block";
+  }
+});
+
+preloadModel.addEventListener("model-error",()=>{
+  modelReady=false;
+  modelLoading=false;
+  setStatus("Erro ao abrir o cenário 3D.");
+  retryBtn.style.display="block";
+});
+
+scene.addEventListener("loaded",()=>setTimeout(loadModel,150));
+
+scene.addEventListener("arReady",()=>{
+  statusEl.classList.add("ready");
+  setStatus("Agora aponte a câmera para a imagem.");
+  forceVideoVisible();
+});
+
+scene.addEventListener("arError",()=>{
+  cameraStarted=false;
+  setStatus("Erro ao iniciar câmera/AR.");
+  retryBtn.style.display="block";
+});
+
+function openDiorama(){
+  if(!modelReady||!hudRoot||dioramaOpen||waitingForRearm)return;
+  dioramaOpen=true;
+  resetHUDTransform();
+  hudRoot.visible=true;
+  document.body.classList.add("diorama-open");
+  zoomControls.style.display="flex";
+  exitBtn.style.display="block";
+  setStatus("Diorama fixo • arraste com 1 dedo • use − / + para zoom");
+}
+
+function closeDiorama(){
+  if(!dioramaOpen)return;
+  dioramaOpen=false;
+  waitingForRearm=true;
+  dragging=false;
+  activePointerId=null;
+  if(openTimer){clearTimeout(openTimer);openTimer=null}
+  if(hudRoot)hudRoot.visible=false;
+  document.body.classList.remove("diorama-open");
+  zoomControls.style.display="none";
+  exitBtn.style.display="none";
+  setStatus("Afaste a câmera e aponte novamente para a imagem.");
+}
+
+target.addEventListener("targetFound",()=>{
+  targetSeen=true;
+  if(targetLostTimer){
+    clearTimeout(targetLostTimer);
+    targetLostTimer=null;
+  }
+  if(waitingForRearm||dioramaOpen)return;
+
+  setStatus("Imagem reconhecida. Abrindo diorama...");
+
+  if(openTimer)clearTimeout(openTimer);
+  openTimer=setTimeout(()=>{
+    if(targetSeen&&!waitingForRearm&&!dioramaOpen)openDiorama();
+  },350);
+});
+
+target.addEventListener("targetLost",()=>{
+  if(targetLostTimer)clearTimeout(targetLostTimer);
+
+  targetLostTimer=setTimeout(()=>{
+    targetSeen=false;
+
+    if(openTimer){
+      clearTimeout(openTimer);
+      openTimer=null;
+    }
+
+    if(waitingForRearm){
+      waitingForRearm=false;
+      setStatus("Agora aponte novamente para a imagem.");
+    }
+
+    targetLostTimer=null;
+  },250);
+});
+
+function changeZoom(factor){
+  if(!dioramaOpen||!hudRoot)return;
+  zoomMultiplier*=factor;
+  zoomMultiplier=Math.max(0.35,Math.min(4.0,zoomMultiplier));
+  applyHUDTransform();
+}
+
+zoomInBtn.addEventListener("click",e=>{e.stopPropagation();changeZoom(1.15)});
+zoomOutBtn.addEventListener("click",e=>{e.stopPropagation();changeZoom(1/1.15)});
+exitBtn.addEventListener("click",e=>{e.stopPropagation();closeDiorama()});
+
+window.addEventListener("pointerdown",event=>{
+  if(!dioramaOpen)return;
+  if(event.target===zoomInBtn||event.target===zoomOutBtn||event.target===exitBtn||event.target===retryBtn)return;
+
+  event.preventDefault();
+  dragging=true;
+  activePointerId=event.pointerId;
+  lastX=event.clientX;
+  lastY=event.clientY;
+},{passive:false});
+
+window.addEventListener("pointermove",event=>{
+  if(!dioramaOpen||!dragging||activePointerId!==event.pointerId)return;
+
+  event.preventDefault();
+
+  const dx=event.clientX-lastX;
+  const dy=event.clientY-lastY;
+
+  rotY+=dx*0.45;
+  rotX+=dy*0.22;
+  rotX=Math.max(-60,Math.min(60,rotX));
+
+  lastX=event.clientX;
+  lastY=event.clientY;
+
+  applyHUDTransform();
+},{passive:false});
+
+function stopDrag(event){
+  if(activePointerId===event.pointerId){
+    dragging=false;
+    activePointerId=null;
+  }
+}
+
+window.addEventListener("pointerup",stopDrag,{passive:false});
+window.addEventListener("pointercancel",stopDrag,{passive:false});
+
+window.addEventListener("wheel",event=>{
+  if(!dioramaOpen)return;
+  event.preventDefault();
+  changeZoom(event.deltaY<0?1.10:0.90);
+},{passive:false});
+
+retryBtn.addEventListener("click",async()=>{
+  retryBtn.style.display="none";
+
+  if(!modelReady){
+    modelLoading=false;
+    loadModel();
+    return;
+  }
+
+  if(!cameraStarted)await startCamera();
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden)setTimeout(forceVideoVisible,200);
+});
+
+window.addEventListener("error",event=>log("JS ERRO: "+event.message));
+window.addEventListener("unhandledrejection",event=>log("PROMISE ERRO: "+String(event.reason)));
+</script>
+</body>
+</html>
